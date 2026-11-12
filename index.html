@@ -165,12 +165,20 @@
       </span>
     </div>
 
-    <!-- 右側小隊管理連結 -->
-    <div class="text-slate-400 hover:text-teal-400 cursor-pointer flex items-center gap-1 text-[11px] ml-auto sm:ml-0" id="btn-jump-team">
-      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-      </svg>
-      <span>管理小隊 (<span id="team-real-count">1</span>人)</span>
+    <!-- 右側小隊管理與退出小隊按鈕 -->
+    <div class="flex items-center gap-2 ml-auto sm:ml-0">
+      <div class="text-slate-400 hover:text-teal-400 cursor-pointer flex items-center gap-1 text-[11px]" id="btn-jump-team">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        <span>管理小隊 (<span id="team-real-count">1</span>人)</span>
+      </div>
+
+      <!-- 頂部醒目的退出隊伍按鈕 -->
+      <button id="btn-header-leave-team" type="button" class="px-2.5 py-1 rounded-xl bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 border border-rose-500/40 text-[11px] font-bold flex items-center gap-1 transition active:scale-95" title="主動退出當前小隊">
+        <span>🚪</span>
+        <span>退出隊伍</span>
+      </button>
     </div>
   </section>
 
@@ -316,6 +324,15 @@
 
         <!-- 跑友列表 (安全 DOM 動態注入) -->
         <div id="leaderboard-container" class="space-y-2"></div>
+      </div>
+
+      <!-- 底部退出小隊區 -->
+      <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
+        <div>小隊代碼: <span id="footer-room-id" class="font-mono text-slate-400">RUN-888</span></div>
+        <button id="btn-leave-team" type="button" class="px-3.5 py-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold flex items-center gap-1.5 transition active:scale-95">
+          <span>🚪</span>
+          <span>主動退出小隊</span>
+        </button>
       </div>
     </div>
   </main>

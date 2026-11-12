@@ -332,14 +332,41 @@ class App {
       });
     }
 
-    // 退出小隊
+    // 退出小隊 (支援頂部狀態列按鈕與底部按鈕)
+    const handleLeaveTeamAction = async () => {
+      const teamName = this.roomName || '跑友小隊';
+      const confirmed = confirm(`確定要退出小隊「${teamName}」嗎？\n退出後將停止 GPS 分享並清除地圖軌跡。`);
+      if (!confirmed) return;
+
+      uiController.showToast('正在退出小隊...', 'info');
+      geolocationService.stopTracking();
+      try {
+        await firebaseService.leaveRoom();
+      } catch (e) {
+        console.warn('退出房間出錯:', e);
+      }
+
+      // 清除網址上的房間與密碼參數
+      const cleanUrl = new URL(window.location.origin + window.location.pathname);
+      window.history.replaceState({}, '', cleanUrl.toString());
+
+      // 清除本機已存的加入設定
+      try {
+        localStorage.removeItem('runner_gps_user_profile');
+      } catch (e) {}
+
+      // 重整回到初始大廳
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    };
+
+    const btnHeaderLeave = document.getElementById('btn-header-leave-team');
+    if (btnHeaderLeave) {
+      btnHeaderLeave.addEventListener('click', handleLeaveTeamAction);
+    }
     if (el.btnLeaveTeam) {
-      el.btnLeaveTeam.addEventListener('click', () => {
-        if (confirm('確定要退出小隊嗎？')) {
-          firebaseService.leaveRoom();
-          window.location.reload();
-        }
-      });
+      el.btnLeaveTeam.addEventListener('click', handleLeaveTeamAction);
     }
 
     // 設定 Modal
