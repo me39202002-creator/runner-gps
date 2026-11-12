@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>跑友即時地圖 | Runner GPS Live Tracker</title>
   
   <!-- Tailwind CSS CDN -->
@@ -37,7 +37,7 @@
     }
   </script>
 
-  <!-- QRCode.js CDN for QR Code generation -->
+  <!-- QRCode.js CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <!-- 客製化樣式 -->
@@ -46,58 +46,75 @@
 <body class="bg-[#0A0F1D] text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
 
   <!-- ========================================================================= -->
-  <!-- 1. 頂部導航列 (Header) -->
+  <!-- 1. 頂部導航列 (針對手機寬度進行完美響應式優化) -->
   <!-- ========================================================================= -->
-  <header class="bg-[#0E172B] border-b border-slate-800/80 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-40">
-    <!-- 左側：標題、房間標籤與狀態 -->
-    <div class="flex items-center gap-3">
-      <!-- 跑步 Logo 圖示 -->
-      <div class="w-9 h-9 rounded-full bg-teal-400/20 border border-teal-400/40 flex items-center justify-center text-teal-400 font-black text-sm tracking-tighter">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-        </svg>
-      </div>
-
-      <div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <h1 class="text-base font-extrabold text-white tracking-wide">跑友即時地圖</h1>
-          
-          <!-- 房間標籤 -->
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-700/50">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span id="header-room-display">房間: RUN-888</span>
-            <span id="header-lock-icon" class="hidden text-amber-400 text-xs">🔒</span>
-          </span>
-
-          <!-- 模式標籤 -->
-          <span id="header-mode-tag" class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
-            純真實模式
-          </span>
+  <header class="bg-[#0E172B] border-b border-slate-800/80 px-3 sm:px-4 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sticky top-0 z-40">
+    <!-- 行動端第一列：Logo、標題與小隊房間標籤 -->
+    <div class="flex items-center justify-between gap-2 w-full sm:w-auto">
+      <div class="flex items-center gap-2">
+        <!-- 跑步 Logo 圖示 -->
+        <div class="w-8 h-8 rounded-full bg-teal-400/20 border border-teal-400/40 flex items-center justify-center text-teal-400 font-black text-sm flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
         </div>
 
-        <p id="header-subtitle" class="text-[11px] text-slate-400 mt-0.5 truncate max-w-md">
-          真實跑友 <span id="stat-real-count">1</span> 人 / 總在線 <span id="stat-online-count">1</span> 人 · 熄屏追蹤常駐中（預設開啟，點擊按鈕可關...）
-        </p>
+        <div>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <h1 class="text-sm sm:text-base font-extrabold text-white tracking-wide">跑友即時地圖</h1>
+            
+            <!-- 房間標籤 -->
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-700/50">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span id="header-room-display">RUN-888</span>
+              <span id="header-lock-icon" class="hidden text-amber-400 text-[10px]">🔒</span>
+            </span>
+
+            <!-- 模式標籤 -->
+            <span id="header-mode-tag" class="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+              純真實模式
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 行動端頂部右側快速按鈕 -->
+      <div class="flex items-center gap-1.5 sm:hidden">
+        <!-- 邀請按鈕 (圖示版) -->
+        <button id="btn-top-invite-mobile" type="button" class="p-1.5 rounded-xl bg-teal-400 text-slate-950 font-bold text-xs flex items-center gap-1 shadow-md" title="邀請跑友">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+          </svg>
+        </button>
+
+        <!-- 熄屏追蹤 (圖示版) -->
+        <button id="btn-toggle-wakelock-mobile" type="button" class="p-1.5 rounded-xl bg-emerald-950 border border-emerald-600/50 text-emerald-400" title="常亮/熄屏追蹤">
+          <span class="text-xs">🌙</span>
+        </button>
+
+        <!-- 口袋黑屏 (圖示版) -->
+        <button id="btn-pocket-mode-mobile" type="button" class="p-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300" title="口袋省電黑屏">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+        </button>
       </div>
     </div>
 
-    <!-- 右側功能按鈕區 -->
-    <div class="flex items-center gap-2">
-      <!-- 加入/邀請跑友按鈕 (綠底顯眼) -->
-      <button id="btn-top-invite" type="button" class="px-3.5 py-1.5 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-500/20">
+    <!-- 桌機與平板頂部功能按鈕區 -->
+    <div class="hidden sm:flex items-center gap-2">
+      <button id="btn-top-invite" type="button" class="px-3.5 py-1.5 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-teal-500/20">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
         </svg>
         <span>加入/邀請跑友</span>
       </button>
 
-      <!-- 熄屏追蹤按鈕 (Wake Lock) -->
       <button id="btn-toggle-wakelock" type="button" class="px-3 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-600/50 text-emerald-400 font-semibold text-xs flex items-center gap-1.5 transition active:scale-95">
         <span>🌙</span>
         <span id="wakelock-btn-text">熄屏追蹤中 (點擊關閉)</span>
       </button>
 
-      <!-- 口袋黑屏按鈕 (省電防誤觸) -->
       <button id="btn-pocket-mode" type="button" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition active:scale-95" title="啟動口袋黑屏防誤觸">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
@@ -105,331 +122,248 @@
         <span>口袋黑屏</span>
       </button>
 
-      <!-- 輔助按鈕圖示 -->
       <button id="btn-help" type="button" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="使用說明">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
       </button>
-
-      <!-- API 金鑰設定按鈕 (已依需求隱藏) -->
-      <button id="btn-toggle-settings" type="button" class="hidden" title="金鑰設定"></button>
     </div>
   </header>
 
   <!-- ========================================================================= -->
-  <!-- 2. 即時個人動態條 (Subheader Status Strip) -->
+  <!-- 2. 即時跑者動態條 (包含醒目的「自訂暱稱」按鈕) -->
   <!-- ========================================================================= -->
-  <section class="bg-[#131E32] border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between text-xs gap-3">
-    <!-- 左側狀態摘要 -->
-    <div class="flex items-center gap-3 flex-wrap">
-      <!-- 隊長徽章 -->
-      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold border border-amber-500/40">
+  <section class="bg-[#131E32] border-b border-slate-800 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between text-xs gap-2">
+    <!-- 跑友資訊、身份標籤與自訂暱稱按鈕 -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <span id="role-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold border border-amber-500/40 text-[11px]">
         👑 隊長
       </span>
 
-      <!-- 跑友名稱與定位狀態 -->
+      <!-- 跑友名稱與點擊自訂按鈕 -->
       <div class="flex items-center gap-1.5 font-semibold text-slate-200">
-        <span class="text-amber-400">⚡</span>
-        <span id="strip-runner-name" class="font-bold text-white">小明隊長</span>
-        <span id="strip-gps-status" class="text-slate-400 text-[11px] font-normal">(GPS 高精確度定位中)</span>
+        <span id="strip-runner-avatar" class="text-base">🏃‍♂️</span>
+        <span id="strip-runner-name" class="font-bold text-white max-w-[120px] sm:max-w-[180px] truncate">小明隊長</span>
+        
+        <!-- 醒目的自訂暱稱按鈕 -->
+        <button id="btn-edit-my-nickname" type="button" class="px-2 py-0.5 rounded-lg bg-teal-400/20 hover:bg-teal-400/30 text-teal-300 border border-teal-400/40 text-[11px] font-bold flex items-center gap-1 transition active:scale-95" title="點擊修改我的跑友暱稱">
+          <span>✏️</span>
+          <span>自訂暱稱</span>
+        </button>
       </div>
 
-      <!-- 配速 -->
-      <div class="flex items-center gap-1 text-teal-400 font-mono font-bold">
-        <span>⚡</span>
-        <span id="strip-pace" class="text-sm">5'52"</span>
+      <!-- 配速與時速 -->
+      <div class="flex items-center gap-2 font-mono font-bold text-xs pl-1">
+        <span class="text-teal-400">⚡ <span id="strip-pace">5'52"</span></span>
+        <span class="text-sky-400">⏱️ <span id="strip-speed">10.2 km/h</span></span>
       </div>
 
-      <!-- 速度 -->
-      <div class="flex items-center gap-1 text-sky-400 font-mono font-bold">
-        <span>⏱️</span>
-        <span id="strip-speed" class="text-sm">10.2 km/h</span>
-      </div>
-
-      <!-- 運動狀態標籤 (如：節奏快跑、輕鬆慢跑) -->
-      <span id="strip-running-phase" class="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[11px] font-medium flex items-center gap-1">
+      <!-- 運動狀態標籤 -->
+      <span id="strip-running-phase" class="hidden sm:inline-flex px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-medium items-center gap-1">
         <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
         狀態: 節奏快跑
       </span>
     </div>
 
     <!-- 右側小隊管理連結 -->
-    <div class="text-slate-400 hover:text-teal-400 cursor-pointer flex items-center gap-1.5" id="btn-jump-team">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="text-slate-400 hover:text-teal-400 cursor-pointer flex items-center gap-1 text-[11px] ml-auto sm:ml-0" id="btn-jump-team">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
       </svg>
-      <span>邀請/管理小隊 (<span id="team-real-count">1</span>人真實)</span>
+      <span>管理小隊 (<span id="team-real-count">1</span>人)</span>
     </div>
   </section>
 
   <!-- ========================================================================= -->
-  <!-- 3. 主內容區：地圖與浮動控制項 -->
+  <!-- 3. 主內容區：地圖與浮動控制項 (全尺寸自動適配) -->
   <!-- ========================================================================= -->
-  <main class="relative flex-1 w-full bg-[#0A0F1D] p-3 flex flex-col gap-4">
-    <!-- 地圖卡片包裝容器 -->
-    <div class="relative w-full h-[52vh] min-h-[400px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-[#131E32]">
+  <main class="relative flex-1 w-full bg-[#0A0F1D] p-2 sm:p-4 flex flex-col gap-3">
+    <!-- 地圖卡片容器 -->
+    <div class="relative w-full h-[45vh] sm:h-[52vh] min-h-[300px] rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-800 shadow-2xl bg-[#131E32]">
       <!-- Google Maps 容器 -->
       <div id="map" class="w-full h-full"></div>
 
       <!-- 地圖左上浮動膠囊標籤 -->
-      <div class="absolute top-3 left-3 z-10 flex flex-col gap-2 pointer-events-none">
-        <div class="pointer-events-auto px-3 py-1.5 rounded-xl bg-slate-900/80 backdrop-blur-md border border-slate-700/60 text-xs font-medium text-emerald-400 flex items-center gap-1.5 shadow-lg">
+      <div class="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 pointer-events-none">
+        <div class="pointer-events-auto px-2.5 py-1 rounded-xl bg-slate-900/85 backdrop-blur-md border border-slate-700/60 text-[11px] font-medium text-emerald-400 flex items-center gap-1.5 shadow-lg">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <span>待機追蹤已啟用 (螢幕防休眠)</span>
+          <span>待機追蹤已啟用</span>
         </div>
 
-        <div class="pointer-events-auto px-3 py-1.5 rounded-xl bg-slate-900/80 backdrop-blur-md border border-slate-700/60 text-xs font-medium text-slate-200 flex items-center gap-1.5 shadow-lg">
+        <div class="pointer-events-auto px-2.5 py-1 rounded-xl bg-slate-900/85 backdrop-blur-md border border-slate-700/60 text-[11px] font-medium text-slate-200 flex items-center gap-1.5 shadow-lg">
           <span class="text-teal-400 font-bold">👥</span>
-          <span>在線跑友：<span id="map-runner-ratio" class="font-mono font-bold text-teal-300">1 / 10</span> 位</span>
+          <span>在線跑友：<span id="map-runner-ratio" class="font-mono font-bold text-teal-300">1 / 10</span></span>
         </div>
       </div>
 
-      <!-- 地圖右上地圖切換開關 (市區地圖 / 衛星航照) -->
-      <div class="absolute top-3 right-3 z-10">
-        <div class="bg-slate-900/85 backdrop-blur-md p-1 rounded-xl border border-slate-700/60 shadow-lg flex items-center text-xs font-semibold">
-          <button id="btn-map-roadmap" type="button" class="px-3 py-1 rounded-lg bg-teal-400 text-slate-950 font-bold transition shadow">
-            市區地圖
+      <!-- 地圖右上地圖切換開關 (市區 / 衛星) -->
+      <div class="absolute top-2.5 right-2.5 z-10">
+        <div class="bg-slate-900/85 backdrop-blur-md p-0.5 rounded-xl border border-slate-700/60 shadow-lg flex items-center text-[11px] font-semibold">
+          <button id="btn-map-roadmap" type="button" class="px-2.5 py-1 rounded-lg bg-teal-400 text-slate-950 font-bold transition shadow">
+            市區
           </button>
-          <button id="btn-map-satellite" type="button" class="px-3 py-1 rounded-lg text-slate-300 hover:text-white transition">
-            衛星航照
+          <button id="btn-map-satellite" type="button" class="px-2.5 py-1 rounded-lg text-slate-300 hover:text-white transition">
+            衛星
           </button>
         </div>
       </div>
 
       <!-- 地圖右下視野控制鍵 -->
-      <div class="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
-        <button id="btn-recenter-self" type="button" class="px-4 py-2 rounded-xl bg-slate-900/90 backdrop-blur-md hover:bg-slate-850 border border-slate-700 text-xs font-bold text-teal-400 flex items-center gap-2 shadow-xl transition active:scale-95">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="absolute bottom-3 right-3 z-10 flex flex-col gap-1.5">
+        <button id="btn-recenter-self" type="button" class="px-3 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md hover:bg-slate-850 border border-slate-700 text-xs font-bold text-teal-400 flex items-center gap-1.5 shadow-xl transition active:scale-95">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="3"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v3m0 14v3M2 12h3m14 0h3"/>
           </svg>
           <span>我的位置</span>
         </button>
 
-        <button id="btn-fit-all" type="button" class="px-4 py-2 rounded-xl bg-slate-900/90 backdrop-blur-md hover:bg-slate-850 border border-slate-700 text-xs font-bold text-sky-400 flex items-center gap-2 shadow-xl transition active:scale-95">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button id="btn-fit-all" type="button" class="px-3 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md hover:bg-slate-850 border border-slate-700 text-xs font-bold text-sky-400 flex items-center gap-1.5 shadow-xl transition active:scale-95">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
           </svg>
-          <span>全隊視野 (<span id="btn-fit-count">1</span>人)</span>
+          <span>全隊視野</span>
         </button>
       </div>
     </div>
 
     <!-- ========================================================================= -->
-    <!-- 4. 跑友即時小隊管理與排行榜面板 (Team Dashboard) -->
+    <!-- 4. 跑友即時小隊管理與排行榜面板 -->
     <!-- ========================================================================= -->
-    <div id="team-dashboard-section" class="bg-[#131E32] rounded-3xl border border-slate-800 p-5 shadow-2xl space-y-4">
+    <div id="team-dashboard-section" class="bg-[#131E32] rounded-2xl sm:rounded-3xl border border-slate-800 p-3.5 sm:p-5 shadow-2xl space-y-3.5">
       <!-- 隊伍標題列 -->
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-xl text-amber-400 shadow-inner">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-lg sm:text-xl text-amber-400 shadow-inner">
             👑
           </div>
           <div>
-            <div class="flex items-center gap-2">
-              <h2 id="dash-team-title" class="text-base font-bold text-white">跑友即時小隊</h2>
-              <span id="captain-badge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-400 text-slate-950">你是隊長</span>
-              <button id="btn-open-captain-settings" type="button" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition flex items-center gap-1" title="隊長小隊權限設定">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <h2 id="dash-team-title" class="text-sm sm:text-base font-bold text-white">跑友即時小隊</h2>
+              <span id="captain-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950">你是隊長</span>
+              <button id="btn-open-captain-settings" type="button" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition flex items-center gap-1" title="隊長設定小隊名稱與密碼">
                 <span>⚙️ 設定小隊</span>
               </button>
             </div>
-            <p class="text-xs text-slate-400 mt-0.5">
+            <p class="text-[11px] text-slate-400 mt-0.5">
               真實跑友 <span id="dash-real-count">1</span> 人 · 總在線 <span id="dash-online-count">1</span> 人
             </p>
           </div>
         </div>
 
         <!-- 房間碼與複製鈕 -->
-        <button id="btn-copy-room" type="button" class="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-mono font-bold text-teal-400 flex items-center gap-2 transition active:scale-95" title="點擊複製房間代碼">
+        <button id="btn-copy-room" type="button" class="px-2.5 py-1 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-mono font-bold text-teal-400 flex items-center gap-1.5 transition active:scale-95" title="點擊複製代碼">
           <span id="dash-room-id">RUN-888</span>
-          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
           </svg>
         </button>
       </div>
 
-      <!-- 核心邀請大按鈕 (一鍵開彈窗或複製) -->
-      <button id="btn-invite-modal" type="button" class="w-full py-3.5 px-4 rounded-2xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 transition active:scale-98 shadow-xl shadow-teal-500/10">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <!-- 核心邀請大按鈕 -->
+      <button id="btn-invite-modal" type="button" class="w-full py-3 px-4 rounded-xl sm:rounded-2xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition active:scale-98 shadow-xl shadow-teal-500/10">
+        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
         </svg>
-        <span>邀請跑友加入 (QR Code / 4位數密碼)</span>
+        <span>邀請跑友加入 (QR Code / 密碼)</span>
       </button>
 
       <!-- 模式說明與虛擬隊友切換 -->
       <div class="flex items-center justify-between text-xs py-1 px-1">
         <div>
-          <span class="text-teal-400 font-bold">純真實模式 (初始預設)</span>
-          <p class="text-slate-400 text-[11px]">無虛擬伴跑，僅真實跑友</p>
+          <span class="text-teal-400 font-bold text-[11px] sm:text-xs">純真實模式</span>
+          <p class="text-slate-400 text-[10px]">無虛擬伴跑，僅真實跑友</p>
         </div>
-        <button id="btn-toggle-virtual" type="button" class="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
+        <button id="btn-toggle-virtual" type="button" class="px-2.5 py-1 rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-700 text-slate-300 font-medium text-[11px] transition">
           切為虛擬隊友
         </button>
       </div>
 
       <!-- 三大關鍵數據方塊 (團隊里程 / 持續分享 / 在線人數) -->
-      <div class="grid grid-cols-3 gap-3">
-        <!-- 團隊里程 -->
-        <div class="bg-[#18263E] border border-slate-800 rounded-2xl p-3 text-center">
-          <div class="flex items-center justify-center gap-1 text-xs text-rose-400 font-semibold mb-1">
-            <span>🚩</span>
-            <span>團隊里程</span>
-          </div>
-          <div id="stat-team-distance" class="text-lg font-black text-white font-mono">0 km</div>
+      <div class="grid grid-cols-3 gap-2 sm:gap-3">
+        <div class="bg-[#18263E] border border-slate-800 rounded-xl sm:rounded-2xl p-2.5 text-center">
+          <div class="text-[10px] sm:text-xs text-rose-400 font-semibold mb-0.5">🚩 團隊里程</div>
+          <div id="stat-team-distance" class="text-sm sm:text-lg font-black text-white font-mono">0 km</div>
         </div>
 
-        <!-- 持續分享 -->
-        <div class="bg-[#18263E] border border-slate-800 rounded-2xl p-3 text-center">
-          <div class="flex items-center justify-center gap-1 text-xs text-emerald-400 font-semibold mb-1">
-            <span>⏱️</span>
-            <span>持續分享</span>
-          </div>
-          <div id="stat-active-runners" class="text-lg font-black text-white font-mono">1 人</div>
+        <div class="bg-[#18263E] border border-slate-800 rounded-xl sm:rounded-2xl p-2.5 text-center">
+          <div class="text-[10px] sm:text-xs text-emerald-400 font-semibold mb-0.5">⏱️ 持續分享</div>
+          <div id="stat-active-runners" class="text-sm sm:text-lg font-black text-white font-mono">1 人</div>
         </div>
 
-        <!-- 在線人數 -->
-        <div class="bg-[#18263E] border border-slate-800 rounded-2xl p-3 text-center">
-          <div class="flex items-center justify-center gap-1 text-xs text-sky-400 font-semibold mb-1">
-            <span>⚡</span>
-            <span>在線人數</span>
-          </div>
-          <div class="text-lg font-black text-white font-mono">
+        <div class="bg-[#18263E] border border-slate-800 rounded-xl sm:rounded-2xl p-2.5 text-center">
+          <div class="text-[10px] sm:text-xs text-sky-400 font-semibold mb-0.5">⚡ 在線人數</div>
+          <div class="text-sm sm:text-lg font-black text-white font-mono">
             <span id="stat-online-num" class="text-teal-400">1</span> / 10
           </div>
         </div>
       </div>
 
-      <!-- 隊長功能：聚集隊友 -->
-      <button id="btn-gather-team" type="button" class="w-full py-2.5 rounded-xl border border-teal-500/40 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 font-bold text-xs flex items-center justify-center gap-2 transition">
-        <span>📍</span>
-        <span>將伴跑隊友聚集至我的 GPS 周邊</span>
-      </button>
-
-      <!-- 排行榜區塊 (跑友里程排行榜) -->
-      <div class="pt-2 space-y-3">
+      <!-- 排行榜區塊 -->
+      <div class="pt-2 space-y-2.5">
         <div class="flex items-center justify-between text-xs">
           <div>
-            <div class="flex items-center gap-1.5 font-bold text-white text-sm">
+            <div class="flex items-center gap-1 font-bold text-white text-xs sm:text-sm">
               <span>🏆</span>
               <span>跑友里程排行榜 (點擊定位)</span>
             </div>
-            <p class="text-[11px] text-amber-400/80 mt-0.5">
-              👑 隊長權限：將跑友向左滑動即可移出小隊
+            <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
+              點選跑友卡片可快速聚焦該隊友地圖位置
             </p>
           </div>
-          <span class="text-slate-400 text-[11px]">配速 / 里程</span>
+          <span class="text-slate-400 text-[10px] sm:text-[11px]">配速 / 里程</span>
         </div>
 
         <!-- 跑友列表 (安全 DOM 動態注入) -->
-        <div id="leaderboard-container" class="space-y-2">
-          <!-- 跑者項目卡片將由 ui-controller 安全渲染 -->
-        </div>
-      </div>
-
-      <!-- 底部退出小隊區 -->
-      <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
-        <div>房間: <span id="footer-room-id" class="font-mono text-slate-400">RUN-888</span></div>
-        <button id="btn-leave-team" type="button" class="px-3 py-1.5 rounded-xl border border-rose-900/60 bg-rose-950/20 hover:bg-rose-900/30 text-rose-400 font-semibold flex items-center gap-1.5 transition">
-          <span>➔</span>
-          <span>自行退出小隊</span>
-        </button>
+        <div id="leaderboard-container" class="space-y-2"></div>
       </div>
     </div>
   </main>
 
   <!-- ========================================================================= -->
-  <!-- 5. 邀請分享彈窗 (QR Code / 密碼) -->
+  <!-- 5. ✏️ 隊友自訂暱稱與頭像彈窗 (Custom Nickname Modal) -->
   <!-- ========================================================================= -->
-  <div id="invite-modal" class="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-[#131E32] border border-slate-700/80 rounded-3xl max-w-sm w-full p-6 space-y-5 text-center shadow-2xl animate-in fade-in duration-200">
-      <div class="space-y-1">
-        <h3 class="text-lg font-extrabold text-white flex items-center justify-center gap-2">
-          <span>👥</span> 邀請跑友加入小隊
-        </h3>
-        <p class="text-xs text-slate-400">用手機相機掃描 QR Code，或分享連結一鍵加入！</p>
-      </div>
-
-      <!-- QR Code 產生容器 -->
-      <div class="flex justify-center p-4 bg-white rounded-2xl max-w-[200px] mx-auto shadow-inner">
-        <div id="qrcode" class="w-[180px] h-[180px]"></div>
-      </div>
-
-      <!-- 房間名稱與 4 位數 / 房間密碼 -->
-      <div class="bg-[#18263E] border border-slate-700 rounded-2xl p-3.5 space-y-2">
-        <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
-          <span class="text-[11px] text-slate-400">小隊名稱</span>
-          <span id="invite-room-name-display" class="text-xs font-bold text-white truncate max-w-[150px]">跑友即時小隊</span>
+  <div id="nickname-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#131E32] border border-teal-500/50 rounded-3xl max-w-sm w-full p-5 sm:p-6 space-y-4 shadow-2xl text-left animate-in fade-in duration-150">
+      <div class="flex items-center justify-between border-b border-slate-700/80 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-teal-400/20 text-teal-400 flex items-center justify-center text-base">
+            ✏️
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-white">自訂我的跑友暱稱</h3>
+            <p class="text-[10px] text-slate-400">設定專屬名字與代表色，讓隊友看見你！</p>
+          </div>
         </div>
-        <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
-          <span class="text-[11px] text-slate-400">小隊代碼</span>
-          <span id="invite-room-code" class="text-lg font-black font-mono text-teal-400 tracking-wider">RUN-888</span>
-        </div>
-        <div class="flex items-center justify-between pt-0.5">
-          <span class="text-[11px] text-slate-400 flex items-center gap-1">
-            <span>🔑</span> 入隊密碼
-          </span>
-          <span id="invite-room-pwd-display" class="text-sm font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-            無密碼 (公開)
-          </span>
-        </div>
+        <button id="btn-close-nickname-modal" type="button" class="text-slate-400 hover:text-white p-1">✕</button>
       </div>
 
-      <div class="space-y-2">
-        <button id="btn-copy-invite-link" type="button" class="w-full py-3 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-extrabold text-sm shadow-lg transition active:scale-95">
-          複製專屬邀請連結
-        </button>
-        <button id="btn-close-invite" type="button" class="w-full py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition">
-          關閉
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ========================================================================= -->
-  <!-- 6. 口袋黑屏模式覆蓋層 (Pocket Black Screen) -->
-  <!-- ========================================================================= -->
-  <div id="pocket-black-screen" class="hidden">
-    <div class="text-center space-y-3 p-6">
-      <div class="text-5xl opacity-40">🔒</div>
-      <p class="text-sm font-semibold text-slate-400">口袋省電與防誤觸中</p>
-      <p class="text-xs text-slate-600 font-mono">背景 GPS 追蹤持續運行</p>
-      <p class="text-[11px] text-teal-400/80 pt-4 animate-pulse">連點兩下螢幕任意處喚醒</p>
-    </div>
-  </div>
-
-  <!-- ========================================================================= -->
-  <!-- 7. 跑友個人資料設定彈窗 (Join / Profile Modal，預設隱藏) -->
-  <!-- ========================================================================= -->
-  <div id="join-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-[#131E32] border border-slate-700/80 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl text-left">
-      <div class="text-center space-y-1">
-        <div class="text-3xl mb-1">🏃‍♂️💨</div>
-        <h3 class="text-lg font-extrabold text-white">加入跑友小隊</h3>
-        <p class="text-xs text-slate-400">設定您的跑友暱稱與代表色，開始即時同步！</p>
-      </div>
-
-      <div class="space-y-3 text-xs">
+      <div class="space-y-3.5 text-xs">
         <div>
-          <label class="block font-bold text-slate-300 uppercase tracking-wider mb-1">跑友暱稱</label>
-          <input id="input-runner-name" type="text" maxlength="20" placeholder="例如：小明隊長"
-                 class="w-full px-3.5 py-2.5 rounded-xl bg-[#18263E] border border-slate-700 text-white focus:outline-none focus:border-teal-400 text-sm">
+          <label class="block font-bold text-slate-200 uppercase tracking-wider mb-1">跑友暱稱 (隊友名稱)</label>
+          <input id="input-custom-nickname" type="text" maxlength="20" placeholder="例如：飛毛腿小華、阿豪"
+                 class="w-full px-3.5 py-2.5 rounded-xl bg-[#18263E] border border-slate-700 text-white focus:outline-none focus:border-teal-400 text-sm font-semibold">
         </div>
 
         <div>
-          <label class="block font-bold text-slate-300 uppercase tracking-wider mb-1">選擇頭像</label>
-          <div id="avatar-selector" class="flex gap-2 justify-between">
+          <label class="block font-bold text-slate-200 uppercase tracking-wider mb-1">代表頭像圖示</label>
+          <div id="nickname-avatar-selector" class="grid grid-cols-5 gap-2">
             <button type="button" class="avatar-opt text-2xl p-2 rounded-xl border-2 border-teal-400 bg-teal-400/10 transition" data-avatar="🏃‍♂️">🏃‍♂️</button>
             <button type="button" class="avatar-opt text-2xl p-2 rounded-xl border-2 border-transparent hover:bg-slate-800 transition" data-avatar="🏃‍♀️">🏃‍♀️</button>
             <button type="button" class="avatar-opt text-2xl p-2 rounded-xl border-2 border-transparent hover:bg-slate-800 transition" data-avatar="⚡">⚡</button>
             <button type="button" class="avatar-opt text-2xl p-2 rounded-xl border-2 border-transparent hover:bg-slate-800 transition" data-avatar="🐆">🐆</button>
             <button type="button" class="avatar-opt text-2xl p-2 rounded-xl border-2 border-transparent hover:bg-slate-800 transition" data-avatar="🚀">🚀</button>
+            <button type="button" class="avatar-opt text-2xl p-2 rounded-xl border-2 border-transparent hover:bg-slate-800 transition" data-avatar="🔥">🔥</button>
+            <button type="button" class="avatar-opt text-2xl p-2 rounded-xl border-2 border-transparent hover:bg-slate-800 transition" data-avatar="👟">👟</button>
+            <button type="button" class="avatar-opt text-2xl p-2 rounded-xl border-2 border-transparent hover:bg-slate-800 transition" data-avatar="🚴">🚴</button>
+            <button type="button" class="avatar-opt text-2xl p-2 rounded-xl border-2 border-transparent hover:bg-slate-800 transition" data-avatar="🐯">🐯</button>
+            <button type="button" class="avatar-opt text-2xl p-2 rounded-xl border-2 border-transparent hover:bg-slate-800 transition" data-avatar="🎯">🎯</button>
           </div>
         </div>
 
         <div>
-          <label class="block font-bold text-slate-300 uppercase tracking-wider mb-1">代表色彩</label>
-          <div id="color-selector" class="flex gap-3 justify-center py-1">
+          <label class="block font-bold text-slate-200 uppercase tracking-wider mb-1">代表色彩</label>
+          <div id="nickname-color-selector" class="flex gap-3 justify-center py-1">
             <button type="button" class="color-opt w-7 h-7 rounded-full bg-teal-400 ring-4 ring-teal-400/30 transition" data-color="#05D5A4"></button>
             <button type="button" class="color-opt w-7 h-7 rounded-full bg-amber-400 transition" data-color="#F59E0B"></button>
             <button type="button" class="color-opt w-7 h-7 rounded-full bg-sky-400 transition" data-color="#38BDF8"></button>
@@ -437,40 +371,109 @@
             <button type="button" class="color-opt w-7 h-7 rounded-full bg-purple-500 transition" data-color="#A855F7"></button>
           </div>
         </div>
-
-        <!-- 小隊房間 ID 與自訂名稱 -->
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block font-bold text-slate-300 uppercase tracking-wider mb-1">小隊代碼 (ID)</label>
-            <input id="input-room-id" type="text" maxlength="32" placeholder="例如：RUN-888"
-                   class="w-full px-3 py-2 rounded-xl bg-[#18263E] border border-slate-700 text-teal-400 font-mono focus:outline-none focus:border-teal-400 text-xs">
-          </div>
-          <div>
-            <label class="block font-bold text-slate-300 uppercase tracking-wider mb-1">自訂小隊名稱</label>
-            <input id="input-room-name" type="text" maxlength="25" placeholder="例如：大安夜跑團"
-                   class="w-full px-3 py-2 rounded-xl bg-[#18263E] border border-slate-700 text-white focus:outline-none focus:border-teal-400 text-xs">
-          </div>
-        </div>
-
-        <!-- 小隊密碼設定 (可選) -->
-        <div>
-          <label class="block font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
-            <span>小隊密碼 (PIN Code)</span>
-            <span class="text-[10px] text-slate-500 font-normal">若留空則為免密碼公開小隊</span>
-          </label>
-          <input id="input-room-password" type="password" maxlength="12" placeholder="4~12 位英數字 (例：1234)"
-                 class="w-full px-3 py-2 rounded-xl bg-[#18263E] border border-slate-700 text-amber-400 font-mono focus:outline-none focus:border-amber-400 text-xs tracking-widest">
-        </div>
       </div>
 
-      <button id="btn-confirm-join" type="button" class="w-full py-3 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-black text-sm shadow-xl transition active:scale-95">
-        儲存並加入小隊
+      <button id="btn-save-nickname" type="button" class="w-full py-3 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-black text-xs sm:text-sm shadow-xl transition active:scale-95">
+        確認儲存暱稱
       </button>
     </div>
   </div>
 
   <!-- ========================================================================= -->
-  <!-- 7.1 輸入密碼加入小隊彈窗 (Password Verification Modal) -->
+  <!-- 6. 邀請分享彈窗 (QR Code / 密碼) -->
+  <!-- ========================================================================= -->
+  <div id="invite-modal" class="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#131E32] border border-slate-700/80 rounded-3xl max-w-sm w-full p-5 sm:p-6 space-y-4 text-center shadow-2xl animate-in fade-in duration-150">
+      <div class="space-y-1">
+        <h3 class="text-base sm:text-lg font-extrabold text-white flex items-center justify-center gap-2">
+          <span>👥</span> 邀請跑友加入小隊
+        </h3>
+        <p class="text-xs text-slate-400">用手機相機掃描 QR Code，一秒加入隊伍！</p>
+      </div>
+
+      <div class="flex justify-center p-3 bg-white rounded-2xl max-w-[190px] mx-auto shadow-inner">
+        <div id="qrcode" class="w-[170px] h-[170px]"></div>
+      </div>
+
+      <div class="bg-[#18263E] border border-slate-700 rounded-2xl p-3 space-y-2 text-left">
+        <div class="flex items-center justify-between border-b border-slate-700/60 pb-1.5">
+          <span class="text-[11px] text-slate-400">小隊名稱</span>
+          <span id="invite-room-name-display" class="text-xs font-bold text-white truncate max-w-[150px]">跑友即時小隊</span>
+        </div>
+        <div class="flex items-center justify-between border-b border-slate-700/60 pb-1.5">
+          <span class="text-[11px] text-slate-400">小隊代碼</span>
+          <span id="invite-room-code" class="text-base font-black font-mono text-teal-400 tracking-wider">RUN-888</span>
+        </div>
+        <div class="flex items-center justify-between pt-0.5">
+          <span class="text-[11px] text-slate-400 flex items-center gap-1">
+            <span>🔑</span> 入隊密碼
+          </span>
+          <span id="invite-room-pwd-display" class="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+            無密碼 (公開)
+          </span>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <button id="btn-copy-invite-link" type="button" class="w-full py-2.5 sm:py-3 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg transition active:scale-95">
+          複製專屬邀請連結
+        </button>
+        <button id="btn-close-invite" type="button" class="w-full py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition">
+          關閉
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 7. 👑 隊長專屬小隊設定彈窗 (Captain Team Settings Modal) -->
+  <!-- ========================================================================= -->
+  <div id="captain-settings-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#131E32] border border-amber-500/50 rounded-3xl max-w-sm w-full p-5 sm:p-6 space-y-4 shadow-2xl animate-in fade-in duration-150">
+      <div class="flex items-center justify-between border-b border-slate-700/80 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-amber-400/20 text-amber-400 flex items-center justify-center text-sm">
+            👑
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">隊長小隊權限設定</h3>
+            <p class="text-[10px] text-amber-400/80">僅隊長具備修改小隊資訊的權限</p>
+          </div>
+        </div>
+        <button id="btn-close-captain-settings" type="button" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-200 uppercase tracking-wider mb-1">🏷️ 小隊名稱：</label>
+          <input id="input-captain-team-name" type="text" maxlength="25" placeholder="例如：大安夜跑團"
+                 class="w-full px-3.5 py-2.5 rounded-xl bg-[#18263E] border border-slate-700 text-white focus:outline-none focus:border-amber-400 text-sm font-medium">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-200 uppercase tracking-wider mb-1">🔢 小隊代碼：</label>
+          <input id="input-captain-team-code" type="text" maxlength="32" placeholder="例如：RUN-888"
+                 class="w-full px-3.5 py-2.5 rounded-xl bg-[#18263E] border border-slate-700 text-teal-400 font-mono focus:outline-none focus:border-amber-400 text-sm font-bold">
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="font-bold text-slate-200 uppercase tracking-wider">🔑 入隊密碼：</label>
+            <button id="btn-captain-clear-pwd" type="button" class="text-[10px] text-slate-400 hover:text-rose-400">設為免密碼公開</button>
+          </div>
+          <input id="input-captain-team-pwd" type="password" maxlength="12" placeholder="4~12 位英數字 (例：1234)"
+                 class="w-full px-3.5 py-2.5 rounded-xl bg-[#18263E] border border-slate-700 text-amber-400 font-mono tracking-widest focus:outline-none focus:border-amber-400 text-sm">
+        </div>
+      </div>
+
+      <button id="btn-save-captain-settings" type="button" class="w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs shadow-xl transition active:scale-95">
+        儲存小隊設定並立即生效
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 8. 密碼驗證彈窗 (Password Verification Modal) -->
   <!-- ========================================================================= -->
   <div id="password-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-[#131E32] border border-amber-500/40 rounded-3xl max-w-xs w-full p-6 space-y-4 text-center shadow-2xl">
@@ -498,109 +501,21 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- 7.2 👑 隊長專屬小隊設定彈窗 (Captain Team Settings Modal) -->
+  <!-- 9. 口袋黑屏模式覆蓋層 -->
   <!-- ========================================================================= -->
-  <div id="captain-settings-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-[#131E32] border border-amber-500/50 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl animate-in fade-in duration-150">
-      <div class="flex items-center justify-between border-b border-slate-700/80 pb-3">
-        <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-lg bg-amber-400/20 text-amber-400 flex items-center justify-center text-sm">
-            👑
-          </div>
-          <div>
-            <h3 class="text-sm font-bold text-white">隊長小隊權限設定</h3>
-            <p class="text-[10px] text-amber-400/80">僅隊長具備修改小隊資訊的權限</p>
-          </div>
-        </div>
-        <button id="btn-close-captain-settings" type="button" class="text-slate-400 hover:text-white p-1 rounded-lg">
-          ✕
-        </button>
-      </div>
-
-      <div class="space-y-3.5 text-xs">
-        <!-- 小隊名稱 -->
-        <div>
-          <label class="block font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-1">
-            <span>🏷️</span>
-            <span>小隊名稱：</span>
-          </label>
-          <input id="input-captain-team-name" type="text" maxlength="25" placeholder="例如：大安夜跑團"
-                 class="w-full px-3.5 py-2.5 rounded-xl bg-[#18263E] border border-slate-700 text-white focus:outline-none focus:border-amber-400 text-sm font-medium">
-        </div>
-
-        <!-- 小隊代碼 -->
-        <div>
-          <label class="block font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-1">
-            <span>🔢</span>
-            <span>小隊代碼：</span>
-          </label>
-          <input id="input-captain-team-code" type="text" maxlength="32" placeholder="例如：RUN-888"
-                 class="w-full px-3.5 py-2.5 rounded-xl bg-[#18263E] border border-slate-700 text-teal-400 font-mono focus:outline-none focus:border-amber-400 text-sm font-bold">
-          <p class="text-[10px] text-slate-500 mt-1">若修改代碼，小隊將以新代碼作為同步房間</p>
-        </div>
-
-        <!-- 入隊密碼 -->
-        <div>
-          <div class="flex items-center justify-between mb-1">
-            <label class="font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1">
-              <span>🔑</span>
-              <span>入隊密碼：</span>
-            </label>
-            <button id="btn-captain-clear-pwd" type="button" class="text-[10px] text-slate-400 hover:text-rose-400">
-              設為免密碼公開
-            </button>
-          </div>
-          <input id="input-captain-team-pwd" type="password" maxlength="12" placeholder="4~12 位英數字 (例：1234)"
-                 class="w-full px-3.5 py-2.5 rounded-xl bg-[#18263E] border border-slate-700 text-amber-400 font-mono tracking-widest focus:outline-none focus:border-amber-400 text-sm">
-          <p class="text-[10px] text-slate-500 mt-1">設定密碼後，新隊友必須輸入此密碼方可加入小隊</p>
-        </div>
-      </div>
-
-      <div class="pt-2 space-y-2">
-        <button id="btn-save-captain-settings" type="button" class="w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs shadow-xl shadow-amber-500/10 transition active:scale-95">
-          儲存小隊設定並立即生效
-        </button>
-      </div>
+  <div id="pocket-black-screen" class="hidden">
+    <div class="text-center space-y-3 p-6">
+      <div class="text-5xl opacity-40">🔒</div>
+      <p class="text-sm font-semibold text-slate-400">口袋省電與防誤觸中</p>
+      <p class="text-xs text-slate-600 font-mono">背景 GPS 追蹤持續運行</p>
+      <p class="text-[11px] text-teal-400/80 pt-4 animate-pulse">連點兩下螢幕任意處喚醒</p>
     </div>
   </div>
 
   <!-- ========================================================================= -->
-  <!-- 8. API 設定彈窗 (Settings Modal) -->
+  <!-- 10. Toast 提示容器 -->
   <!-- ========================================================================= -->
-  <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-[#131E32] border border-slate-700 rounded-3xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between border-b border-slate-700 pb-3">
-        <h3 class="font-bold text-white text-base flex items-center gap-2">
-          <span>⚙️</span> API 與雲端連線設定
-        </h3>
-        <button id="btn-close-settings" type="button" class="text-slate-400 hover:text-white p-1">✕</button>
-      </div>
-
-      <div class="space-y-3 text-xs">
-        <div>
-          <label class="block font-bold text-slate-300 mb-1">Google Maps API Key</label>
-          <input id="input-google-key" type="password" class="w-full px-3 py-2 rounded-xl bg-[#18263E] border border-slate-700 text-white font-mono">
-        </div>
-        <div>
-          <label class="block font-bold text-slate-300 mb-1">Firebase Database URL</label>
-          <input id="input-firebase-dburl" type="text" class="w-full px-3 py-2 rounded-xl bg-[#18263E] border border-slate-700 text-white font-mono">
-        </div>
-        <div>
-          <label class="block font-bold text-slate-300 mb-1">Firebase API Key</label>
-          <input id="input-firebase-apikey" type="password" class="w-full px-3 py-2 rounded-xl bg-[#18263E] border border-slate-700 text-white font-mono">
-        </div>
-      </div>
-
-      <button id="btn-save-settings" type="button" class="w-full py-2.5 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-bold text-xs transition">
-        儲存並重整
-      </button>
-    </div>
-  </div>
-
-  <!-- ========================================================================= -->
-  <!-- 9. Toast 提示容器 -->
-  <!-- ========================================================================= -->
-  <div id="toast-container" class="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none"></div>
+  <div id="toast-container" class="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none px-4 w-full max-w-sm"></div>
 
   <!-- 載入核心模組 -->
   <script type="module" src="js/app.js"></script>

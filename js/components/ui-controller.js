@@ -30,19 +30,31 @@ class UIController {
       statRealCount: document.getElementById('stat-real-count'),
       statOnlineCount: document.getElementById('stat-online-count'),
       btnTopInvite: document.getElementById('btn-top-invite'),
+      btnTopInviteMobile: document.getElementById('btn-top-invite-mobile'),
       btnToggleWakelock: document.getElementById('btn-toggle-wakelock'),
+      btnToggleWakelockMobile: document.getElementById('btn-toggle-wakelock-mobile'),
       wakelockBtnText: document.getElementById('wakelock-btn-text'),
       btnPocketMode: document.getElementById('btn-pocket-mode'),
-      btnToggleSettings: document.getElementById('btn-toggle-settings'),
+      btnPocketModeMobile: document.getElementById('btn-pocket-mode-mobile'),
 
       // 跑者狀態條
+      roleBadge: document.getElementById('role-badge'),
+      stripRunnerAvatar: document.getElementById('strip-runner-avatar'),
       stripRunnerName: document.getElementById('strip-runner-name'),
-      stripGpsStatus: document.getElementById('strip-gps-status'),
+      btnEditMyNickname: document.getElementById('btn-edit-my-nickname'),
       stripPace: document.getElementById('strip-pace'),
       stripSpeed: document.getElementById('strip-speed'),
       stripRunningPhase: document.getElementById('strip-running-phase'),
       teamRealCount: document.getElementById('team-real-count'),
       btnJumpTeam: document.getElementById('btn-jump-team'),
+
+      // 自訂暱稱彈窗
+      nicknameModal: document.getElementById('nickname-modal'),
+      btnCloseNicknameModal: document.getElementById('btn-close-nickname-modal'),
+      inputCustomNickname: document.getElementById('input-custom-nickname'),
+      nicknameAvatarSelector: document.getElementById('nickname-avatar-selector'),
+      nicknameColorSelector: document.getElementById('nickname-color-selector'),
+      btnSaveNickname: document.getElementById('btn-save-nickname'),
 
       // 地圖浮動控制
       mapRunnerRatio: document.getElementById('map-runner-ratio'),
@@ -155,6 +167,18 @@ class UIController {
   updateSelfStrip(runnerData) {
     if (this.elements.stripRunnerName && runnerData.name) {
       this.elements.stripRunnerName.textContent = runnerData.name;
+    }
+    if (this.elements.stripRunnerAvatar && runnerData.avatar) {
+      this.elements.stripRunnerAvatar.textContent = runnerData.avatar;
+    }
+    if (this.elements.roleBadge) {
+      if (runnerData.isCaptain) {
+        this.elements.roleBadge.textContent = '👑 隊長';
+        this.elements.roleBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold border border-amber-500/40 text-[11px]';
+      } else {
+        this.elements.roleBadge.textContent = '🏃 隊友';
+        this.elements.roleBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-bold border border-teal-500/40 text-[11px]';
+      }
     }
 
     const speed = runnerData.speed || 0;
@@ -541,6 +565,24 @@ class UIController {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
       }, 300);
     }, 3200);
+  }
+
+  /**
+   * 自訂暱稱與個人化設定彈窗
+   */
+  openNicknameModal(currentName, currentAvatar, currentColor) {
+    if (!this.elements.nicknameModal) return;
+    this.elements.nicknameModal.classList.remove('hidden');
+    if (this.elements.inputCustomNickname) {
+      this.elements.inputCustomNickname.value = currentName || '熱血跑友';
+      this.elements.inputCustomNickname.focus();
+    }
+  }
+
+  closeNicknameModal() {
+    if (this.elements.nicknameModal) {
+      this.elements.nicknameModal.classList.add('hidden');
+    }
   }
 
   /**

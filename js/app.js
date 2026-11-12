@@ -51,7 +51,8 @@ class App {
       this.roomPassword = sanitizeRoomPassword(urlPwd);
     }
 
-    this.loadSavedProfile();
+    // 若從分享連結開啟，標記為加入的隊友
+    this.loadSavedProfile(!!safeUrlRoom && safeUrlRoom !== 'RUN-888');
 
     uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
     uiController.setSelfRunnerId(this.selfRunner.id);
@@ -64,39 +65,41 @@ class App {
     await this.startServices();
   }
 
-  loadSavedProfile() {
+  loadSavedProfile(isInvitedTeammate = false) {
     try {
       const saved = localStorage.getItem('runner_gps_user_profile');
       if (saved) {
         const parsed = JSON.parse(saved);
         this.selfRunner = {
           id: parsed.id || generateSafeRunnerId(),
-          name: sanitizeRunnerName(parsed.name, '小明隊長'),
-          avatar: parsed.avatar || '🏃‍♂️',
+          name: sanitizeRunnerName(parsed.name, isInvitedTeammate ? '熱血隊友' : '小明隊長'),
+          avatar: parsed.avatar || (isInvitedTeammate ? '🏃‍♀️' : '🏃‍♂️'),
           color: sanitizeColor(parsed.color, '#05D5A4'),
-          isCaptain: true
+          isCaptain: isInvitedTeammate ? false : (parsed.isCaptain ?? true)
         };
       } else {
         this.selfRunner = {
           id: generateSafeRunnerId(),
-          name: '小明隊長',
-          avatar: '🏃‍♂️',
+          name: isInvitedTeammate ? '熱血隊友' : '小明隊長',
+          avatar: isInvitedTeammate ? '🏃‍♀️' : '🏃‍♂️',
           color: '#05D5A4',
-          isCaptain: true
+          isCaptain: !isInvitedTeammate
         };
+        // 第一次透過分享連結加入的隊友，自動提示設定專屬暱稱
+        if (isInvitedTeammate) {
+          setTimeout(() => {
+            uiController.openNicknameModal(this.selfRunner.name, this.selfRunner.avatar, this.selfRunner.color);
+          }, 800);
+        }
       }
     } catch (e) {
       this.selfRunner = {
         id: generateSafeRunnerId(),
-        name: '小明隊長',
+        name: isInvitedTeammate ? '熱血隊友' : '小明隊長',
         avatar: '🏃‍♂️',
         color: '#05D5A4',
-        isCaptain: true
+        isCaptain: !isInvitedTeammate
       };
-    }
-
-    if (uiController.elements.inputRunnerName) {
-      uiController.elements.inputRunnerName.value = this.selfRunner.name;
     }
   }
 
@@ -141,6 +144,62 @@ class App {
     // 確認加入小隊
     if (el.btnConfirmJoin) {
       el.btnConfirmJoin.addEventListener('click', () => this.handleConfirmJoin());
+    }
+
+    // 自訂跑友暱稱彈窗開關與選擇
+    if (el.btnEditMyNickname) {
+      el.btnEditMyNickname.addEventListener('click', () => {
+        uiController.openNicknameModal(this.selfRunner.name, this.selfRunner.avatar, this.selfRunner.color);
+      });
+    }
+    if (el.btnCloseNicknameModal) {
+      el.btnCloseNicknameModal.addEventListener('click', () => {
+        uiController.closeNicknameModal();
+      });
+    }
+
+    // 暱稱彈窗內選頭像
+    if (el.nicknameAvatarSelector) {
+      el.nicknameAvatarSelector.addEventListener('click', (e) => {
+        const btn = e.target.closest('.avatar-opt');
+        if (!btn) return;
+        el.nicknameAvatarSelector.querySelectorAll('.avatar-opt').forEach((b) => {
+          b.classList.remove('border-teal-400', 'bg-teal-400/10');
+          b.classList.add('border-transparent');
+        });
+        btn.classList.add('border-teal-400', 'bg-teal-400/10');
+        btn.classList.remove('border-transparent');
+        this.selfRunner.avatar = btn.dataset.avatar || '🏃‍♂️';
+      });
+    }
+
+    // 暱稱彈窗內選顏色
+    if (el.nicknameColorSelector) {
+      el.nicknameColorSelector.addEventListener('click', (e) => {
+        const btn = e.target.closest('.color-opt');
+        if (!btn) return;
+        el.nicknameColorSelector.querySelectorAll('.color-opt').forEach((b) => {
+          b.classList.remove('ring-4', 'ring-teal-400/30');
+        });
+        btn.classList.add('ring-4', 'ring-teal-400/30');
+        this.selfRunner.color = sanitizeColor(btn.dataset.color, '#05D5A4');
+      });
+    }
+
+    // 儲存自訂暱稱
+    if (el.btnSaveNickname) {
+      el.btnSaveNickname.addEventListener('click', () => this.handleSaveCustomNickname());
+    }
+
+    // 行動端快捷按鈕綁定
+    if (el.btnTopInviteMobile) {
+      el.btnTopInviteMobile.addEventListener('click', () => this.showInviteModal());
+    }
+    if (el.btnToggleWakelockMobile) {
+      el.btnToggleWakelockMobile.addEventListener('click', () => uiController.toggleWakeLock());
+    }
+    if (el.btnPocketModeMobile) {
+      el.btnPocketModeMobile.addEventListener('click', () => uiController.togglePocketMode(true));
     }
 
     // 邀請彈窗 (頂部鈕與大按鈕)
@@ -293,6 +352,48 @@ class App {
     if (el.btnSaveSettings) {
       el.btnSaveSettings.addEventListener('click', () => this.saveSettings());
     }
+  }
+
+  /**
+   * 隊友儲存自訂暱稱與頭像
+   */
+  async handleSaveCustomNickname() {
+    const el = uiController.elements;
+    const rawName = el.inputCustomNickname ? el.inputCustomNickname.value : '';
+    const newName = sanitizeRunnerName(rawName, this.selfRunner.name || '熱血跑友');
+
+    this.selfRunner.name = newName;
+    this.saveProfile();
+
+    // 更新即時動態條
+    uiController.updateSelfStrip(this.selfRunner);
+
+    // 若地圖與服務已啟動，即刻同步到 Firebase 與地圖 Marker
+    if (this.latestSelfCoords) {
+      const updatedData = {
+        ...this.selfRunner,
+        lat: this.latestSelfCoords.lat,
+        lng: this.latestSelfCoords.lng,
+        speed: this.latestSelfCoords.speed,
+        heading: this.latestSelfCoords.heading,
+        totalDistanceMeters: this.latestSelfCoords.totalDistanceMeters || 0,
+        isOnline: true,
+        updatedAt: Date.now()
+      };
+      mapRenderer.updateRunner(this.selfRunner.id, updatedData, true);
+      uiController.upsertRunner(this.selfRunner.id, updatedData, (id, r) => {
+        mapRenderer.panTo(r.lat, r.lng, 17);
+      });
+    }
+
+    try {
+      await firebaseService.joinRoom(this.roomId, this.selfRunner);
+      uiController.showToast(`✅ 暱稱已更新為「${this.selfRunner.name}」！`, 'success');
+    } catch (e) {
+      console.warn('[App] 同步個人暱稱至雲端失敗:', e);
+    }
+
+    uiController.closeNicknameModal();
   }
 
   /**
