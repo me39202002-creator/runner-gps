@@ -471,12 +471,8 @@ class App {
     this.hasRoomPassword = !!newPwd;
 
     if (isCodeChanged) {
-      // 若小隊代碼變更，立即清理舊房間並隔離
+      // 若代碼變更，遷移至新房間
       await firebaseService.leaveRoom();
-      if (mapRenderer) mapRenderer.clearAll();
-      this.cachedRunners.clear();
-      uiController.clearAllRunners();
-
       this.roomId = newCode;
       await firebaseService.verifyAndJoinRoom(
         this.roomId,
@@ -546,12 +542,6 @@ class App {
   }
 
   async startServices() {
-    // 嚴格房間隔離：完全清空舊房間之地圖 Marker、跑友快取與 Firebase 監聽
-    if (mapRenderer) mapRenderer.clearAll();
-    this.cachedRunners.clear();
-    uiController.clearAllRunners();
-    firebaseService.unsubscribe();
-
     // 1. 初始化 Google Maps
     try {
       await mapRenderer.loadGoogleMaps(this.config.googleMapsApiKey);

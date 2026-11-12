@@ -292,24 +292,6 @@ class MapRenderer {
     }
   }
 
-  /**
-   * 完全清空地圖上所有跑友的標記與軌跡 (切換房間或退出時徹底隔離)
-   */
-  clearAll() {
-    this.runners.forEach((runnerObj) => {
-      if (runnerObj.marker) runnerObj.marker.setMap(null);
-      if (runnerObj.polyline) runnerObj.polyline.setMap(null);
-      if (runnerObj.accuracyCircle) runnerObj.accuracyCircle.setMap(null);
-      if (runnerObj.infoWindow) runnerObj.infoWindow.close();
-    });
-    this.runners.clear();
-    if (this.activeInfoWindow) {
-      this.activeInfoWindow.close();
-      this.activeInfoWindow = null;
-    }
-    console.log('[MapRenderer] 地圖跑友標記與軌跡已完全清空');
-  }
-
   panTo(lat, lng, zoom = null) {
     if (!this.map) return;
     this.map.panTo(new google.maps.LatLng(lat, lng));
