@@ -54,18 +54,32 @@ class App {
       this.roomPassword = sanitizeRoomPassword(urlPwd);
     }
 
-    // 若從分享連結開啟，標記為加入的隊友
+    // 檢查是否曾經主動退出小隊或被移出
+    const hasJoinedStatus = localStorage.getItem('runner_gps_has_joined');
+    const needExplicitJoin = hasJoinedStatus === 'false';
+
     this.loadSavedProfile(!!safeUrlRoom && safeUrlRoom !== 'RUN-888');
 
     uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
     uiController.setSelfRunnerId(this.selfRunner.id);
     mapRenderer.setSelfRunnerId(this.selfRunner.id);
 
-    // 初始進入主畫面
-    uiController.toggleJoinModal(false);
-    uiController.togglePocketMode(false);
-
-    await this.startServices();
+    // 若使用者曾退出或被踢出，強制彈出加入彈窗，需重新加入才能進入小隊
+    if (needExplicitJoin) {
+      if (uiController.elements.inputRoomId) uiController.elements.inputRoomId.value = this.roomId;
+      if (uiController.elements.inputRunnerName) uiController.elements.inputRunnerName.value = this.selfRunner.name;
+      uiController.toggleJoinModal(true);
+      uiController.showToast('請確認暱稱與小隊代碼，點擊「加入小隊」進入', 'info');
+      // 先載入地圖背景，但不加入小隊與不發送座標
+      try {
+        await mapRenderer.loadGoogleMaps(this.config.googleMapsApiKey);
+        mapRenderer.initMap('map', this.config.mapDefaults);
+      } catch (e) {}
+    } else {
+      uiController.toggleJoinModal(false);
+      uiController.togglePocketMode(false);
+      await this.startServices();
+    }
   }
 
   loadSavedProfile(isInvitedTeammate = false) {
@@ -346,19 +360,26 @@ class App {
         console.warn('退出房間出錯:', e);
       }
 
+      // 標記為未加入狀態
+      localStorage.setItem('runner_gps_has_joined', 'false');
+
+      // 清除本地跑友暫存與地圖標記
+      this.cachedRunners.clear();
+      this.latestSelfCoords = null;
+      if (mapRenderer && mapRenderer.runners) {
+        mapRenderer.runners.forEach((r, id) => mapRenderer.removeRunner(id));
+      }
+      uiController.refreshDashboard(null, null, false);
+
       // 清除網址上的房間與密碼參數
       const cleanUrl = new URL(window.location.origin + window.location.pathname);
       window.history.replaceState({}, '', cleanUrl.toString());
 
-      // 清除本機已存的加入設定
-      try {
-        localStorage.removeItem('runner_gps_user_profile');
-      } catch (e) {}
-
-      // 重整回到初始大廳
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
+      // 彈出加入小隊彈窗，強制使用者必須點擊「儲存並加入小隊」才能再次進入
+      if (uiController.elements.inputRoomId) uiController.elements.inputRoomId.value = this.roomId;
+      if (uiController.elements.inputRunnerName) uiController.elements.inputRunnerName.value = this.selfRunner.name;
+      uiController.toggleJoinModal(true);
+      uiController.showToast('已退出小隊。需重新輸入小隊代碼並點擊加入才能進入！', 'info');
     };
 
     const btnHeaderLeave = document.getElementById('btn-header-leave-team');
@@ -500,6 +521,8 @@ class App {
     this.roomPassword = sanitizeRoomPassword(rawRoomPwd);
     this.hasRoomPassword = !!this.roomPassword;
 
+    // 標記為已確認加入小隊
+    localStorage.setItem('runner_gps_has_joined', 'true');
     this.saveProfile();
     uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
     uiController.setSelfRunnerId(this.selfRunner.id);
@@ -737,13 +760,29 @@ class App {
 
   handleRunnerRemoved(runnerId) {
     this.cachedRunners.delete(runnerId);
-    // 若自己被隊長移出小隊或離線超時
+    
+    // 若自己被隊長移出小隊
     if (runnerId === this.selfRunner.id) {
       geolocationService.stopTracking();
-      uiController.showToast('⚠️ 您已離開或被移出小隊', 'warning');
+      // 標記為未加入狀態
+      localStorage.setItem('runner_gps_has_joined', 'false');
+
+      // 清除本地跑友暫存與地圖標記
+      this.cachedRunners.clear();
+      this.latestSelfCoords = null;
+      if (mapRenderer && mapRenderer.runners) {
+        mapRenderer.runners.forEach((r, id) => mapRenderer.removeRunner(id));
+      }
+      uiController.refreshDashboard(null, null, false);
+
+      uiController.showToast('⚠️ 您已被隊長移出小隊，需要重新加入才能進入！', 'error');
+
+      // 彈出加入小隊彈窗，強制重新輸入小隊代碼與密碼重新加入
       setTimeout(() => {
-        window.location.href = window.location.origin + window.location.pathname;
-      }, 1500);
+        if (uiController.elements.inputRoomId) uiController.elements.inputRoomId.value = this.roomId;
+        if (uiController.elements.inputRunnerName) uiController.elements.inputRunnerName.value = this.selfRunner.name;
+        uiController.toggleJoinModal(true);
+      }, 800);
       return;
     }
 
