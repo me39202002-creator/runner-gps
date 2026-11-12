@@ -298,6 +298,40 @@ class MapRenderer {
     if (zoom) this.map.setZoom(zoom);
   }
 
+  /**
+   * 聚焦特定跑友至地圖正中央，並彈出資訊視窗與跳動提示
+   * @param {string} runnerId 
+   */
+  focusRunner(runnerId) {
+    if (!this.map) return false;
+    const runnerObj = this.runners.get(runnerId);
+    if (!runnerObj || !runnerObj.marker) return false;
+
+    const pos = runnerObj.marker.getPosition();
+    if (!pos) return false;
+
+    // 平滑移至中央
+    this.map.panTo(pos);
+    this.map.setZoom(17);
+
+    // 跳出該隊友的即時資訊氣泡 (InfoWindow)
+    if (runnerObj.infoWindow) {
+      if (this.activeInfoWindow) this.activeInfoWindow.close();
+      runnerObj.infoWindow.open(this.map, runnerObj.marker);
+      this.activeInfoWindow = runnerObj.infoWindow;
+    }
+
+    // 觸發標記短暫跳動動畫 (Bounce)
+    if (runnerObj.marker.setAnimation) {
+      runnerObj.marker.setAnimation(google.maps.Animation.BOUNCE);
+      setTimeout(() => {
+        runnerObj.marker.setAnimation(null);
+      }, 1400);
+    }
+
+    return true;
+  }
+
   fitAllRunners() {
     if (!this.map || this.runners.size === 0) return;
     const bounds = new google.maps.LatLngBounds();

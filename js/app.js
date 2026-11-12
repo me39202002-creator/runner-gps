@@ -700,7 +700,7 @@ class App {
     uiController.upsertRunner(
       this.selfRunner.id,
       selfData,
-      (id, r) => mapRenderer.panTo(r.lat, r.lng, 17),
+      (id, r) => this.handleFocusRunner(id, r),
       (id, r) => this.handleKickRunner(id, r),
       this.selfRunner.isCaptain
     );
@@ -725,9 +725,7 @@ class App {
     uiController.upsertRunner(
       runnerId,
       runnerData,
-      (id, r) => {
-        if (r.lat && r.lng) mapRenderer.panTo(r.lat, r.lng, 17);
-      },
+      (id, r) => this.handleFocusRunner(id, r),
       (id, r) => this.handleKickRunner(id, r),
       this.selfRunner.isCaptain
     );
@@ -752,12 +750,37 @@ class App {
     mapRenderer.removeRunner(runnerId);
     uiController.removeRunner(
       runnerId,
-      (id, r) => {
-        if (r.lat && r.lng) mapRenderer.panTo(r.lat, r.lng, 17);
-      },
+      (id, r) => this.handleFocusRunner(id, r),
       (id, r) => this.handleKickRunner(id, r),
       this.selfRunner.isCaptain
     );
+  }
+
+  /**
+   * 點選隊友卡片：將隊友平滑移至地圖正中央，並自動滑動手機視角至地圖
+   */
+  handleFocusRunner(runnerId, runner) {
+    const runnerName = runner.name || '跑友';
+
+    // 1. 嘗試透過地圖專屬聚焦 (包含標記跳動動畫與彈出即時氣泡)
+    const focused = mapRenderer.focusRunner(runnerId);
+
+    // 若尚未生成 marker，直接透過經緯度平滑聚焦
+    if (!focused) {
+      const lat = runner.lat || (this.latestSelfCoords ? this.latestSelfCoords.lat : null);
+      const lng = runner.lng || (this.latestSelfCoords ? this.latestSelfCoords.lng : null);
+      if (lat && lng) {
+        mapRenderer.panTo(lat, lng, 17);
+      }
+    }
+
+    // 2. 在手機螢幕上，自動平滑滾動畫面回到頂部地圖，讓使用者清楚看見隊友
+    const mapElement = document.getElementById('map');
+    if (mapElement) {
+      mapElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    uiController.showToast(`🎯 已將「${runnerName}」移至地圖正中央！`, 'success');
   }
 
   /**
