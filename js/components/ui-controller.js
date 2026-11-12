@@ -235,20 +235,20 @@ class UIController {
   /**
    * 更新跑友或新增
    */
-  upsertRunner(runnerId, runnerData, onFocusRunner) {
+  upsertRunner(runnerId, runnerData, onFocusRunner, onKickRunner = null, isCaptain = false) {
     this.cachedRunners.set(runnerId, runnerData);
-    this.refreshDashboard(onFocusRunner);
+    this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain);
   }
 
-  removeRunner(runnerId, onFocusRunner) {
+  removeRunner(runnerId, onFocusRunner, onKickRunner = null, isCaptain = false) {
     this.cachedRunners.delete(runnerId);
-    this.refreshDashboard(onFocusRunner);
+    this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain);
   }
 
   /**
    * 刷新排行榜與三大統計數據卡片 (安全 DOM 渲染)
    */
-  refreshDashboard(onFocusRunner) {
+  refreshDashboard(onFocusRunner, onKickRunner = null, isCaptain = false) {
     const list = Array.from(this.cachedRunners.entries());
     const totalCount = list.length;
     const onlineCount = list.filter(([_, r]) => r.isOnline !== false).length;
@@ -350,8 +350,31 @@ class UIController {
         createSafeElement('div', { class: 'text-right flex-shrink-0 font-mono' }, [
           createSafeElement('div', { class: 'text-sm font-bold text-teal-400' }, pace),
           createSafeElement('div', { class: 'text-[11px] text-slate-400' }, `${distKm} km`)
-        ])
-      ]);
+        ]),
+
+        // 隊長專屬：移出/刪除隊友按鈕 (僅隊長看得到，且不顯示在自己身上)
+        isCaptain && !isSelf
+          ? createSafeElement('button', {
+              type: 'button',
+              class: 'p-1.5 px-2 text-[10px] font-bold rounded-lg bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 transition flex items-center gap-1 active:scale-90 flex-shrink-0 ml-1',
+              title: '將此跑友移出小隊'
+            }, [
+              createSafeElement('span', {}, '✕'),
+              createSafeElement('span', { class: 'hidden sm:inline' }, '移出')
+            ])
+          : null
+      ].filter(Boolean));
+
+      // 若有移出按鈕，綁定踢出事件 (阻止事件冒泡以免觸發點擊定位)
+      if (isCaptain && !isSelf) {
+        const kickBtn = card.querySelector('button[title="將此跑友移出小隊"]');
+        if (kickBtn && typeof onKickRunner === 'function') {
+          kickBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onKickRunner(id, runner);
+          });
+        }
+      }
 
       // 點擊跑者卡片即可定位地圖視角
       card.addEventListener('click', () => {

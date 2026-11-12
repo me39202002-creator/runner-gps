@@ -267,6 +267,17 @@ class FirebaseService {
   }
 
   /**
+   * 隊長將特定跑友移出小隊
+   * @param {string} roomId 
+   * @param {string} runnerId 
+   */
+  async kickRunner(roomId, runnerId) {
+    if (!this.db || !roomId || !runnerId) return;
+    const runnerRef = ref(this.db, `rooms/${roomId}/runners/${runnerId}`);
+    await remove(runnerRef);
+  }
+
+  /**
    * 主動退出房間並清除監聽
    */
   async leaveRoom() {

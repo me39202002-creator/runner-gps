@@ -615,9 +615,13 @@ class App {
 
     // 本機 Optimistic UI 零延遲更新
     mapRenderer.updateRunner(this.selfRunner.id, selfData, true);
-    uiController.upsertRunner(this.selfRunner.id, selfData, (id, r) => {
-      mapRenderer.panTo(r.lat, r.lng, 17);
-    });
+    uiController.upsertRunner(
+      this.selfRunner.id,
+      selfData,
+      (id, r) => mapRenderer.panTo(r.lat, r.lng, 17),
+      (id, r) => this.handleKickRunner(id, r),
+      this.selfRunner.isCaptain
+    );
     uiController.updateSelfStrip(selfData);
 
     if (!this.hasInitiallyCentered) {
@@ -635,9 +639,15 @@ class App {
   handleRunnerUpdated(runnerId, runnerData) {
     const isSelf = runnerId === this.selfRunner.id;
     mapRenderer.updateRunner(runnerId, runnerData, isSelf);
-    uiController.upsertRunner(runnerId, runnerData, (id, r) => {
-      if (r.lat && r.lng) mapRenderer.panTo(r.lat, r.lng, 17);
-    });
+    uiController.upsertRunner(
+      runnerId,
+      runnerData,
+      (id, r) => {
+        if (r.lat && r.lng) mapRenderer.panTo(r.lat, r.lng, 17);
+      },
+      (id, r) => this.handleKickRunner(id, r),
+      this.selfRunner.isCaptain
+    );
 
     if (isSelf) {
       uiController.updateSelfStrip(runnerData);
@@ -645,8 +655,47 @@ class App {
   }
 
   handleRunnerRemoved(runnerId) {
+    // 若自己被隊長移出小隊
+    if (runnerId === this.selfRunner.id) {
+      geolocationService.stopTracking();
+      uiController.showToast('⚠️ 您已被隊長移出小隊', 'warning');
+      setTimeout(() => {
+        window.location.href = window.location.origin + window.location.pathname;
+      }, 1500);
+      return;
+    }
+
     mapRenderer.removeRunner(runnerId);
-    uiController.removeRunner(runnerId);
+    uiController.removeRunner(
+      runnerId,
+      (id, r) => {
+        if (r.lat && r.lng) mapRenderer.panTo(r.lat, r.lng, 17);
+      },
+      (id, r) => this.handleKickRunner(id, r),
+      this.selfRunner.isCaptain
+    );
+  }
+
+  /**
+   * 隊長移出/刪除隊友
+   */
+  async handleKickRunner(runnerId, runner) {
+    if (!this.selfRunner.isCaptain) {
+      uiController.showToast('只有隊長有權限移出隊友', 'warning');
+      return;
+    }
+
+    const runnerName = runner.name || '此跑友';
+    const confirmed = confirm(`👑 隊長權限確認：\n確定要將「${runnerName}」移出小隊嗎？`);
+    if (!confirmed) return;
+
+    try {
+      await firebaseService.kickRunner(this.roomId, runnerId);
+      uiController.showToast(`已成功將「${runnerName}」移出小隊`, 'success');
+    } catch (err) {
+      console.error('[App] 移出隊友出錯:', err);
+      uiController.showToast('移出隊友失敗，請重試', 'error');
+    }
   }
 
   /**
