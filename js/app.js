@@ -32,8 +32,11 @@ class App {
     this.selfRunner = null;
     this.isTracking = false;
     this.latestSelfCoords = null;
+    this.cachedRunners = new Map();
     this.virtualRunnersInterval = null;
     this.isVirtualMode = false;
+    this.heartbeatTimer = null;
+    this.offlineSweepTimer = null;
   }
 
   async init() {
@@ -551,6 +554,58 @@ class App {
 
     // 3. 自動啟動 GPS 追蹤
     this.startTracking();
+
+    // 4. 啟動在線心跳與「離線 3 分鐘自動退出小隊」定期清理機制
+    this.startHeartbeatAndSweep();
+  }
+
+  /**
+   * 啟動在線心跳包與離線 3 分鐘自動清理排程
+   */
+  startHeartbeatAndSweep() {
+    // 清除舊定時器
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    if (this.offlineSweepTimer) clearInterval(this.offlineSweepTimer);
+
+    // 每 25 秒發送一次心跳包，維持線上活躍狀態
+    this.heartbeatTimer = setInterval(() => {
+      firebaseService.sendHeartbeat();
+    }, 25000);
+
+    // 每 15 秒掃描一次小隊成員，若有人離線超過 3 分鐘 (180,000 ms) 自動移出小隊
+    this.offlineSweepTimer = setInterval(() => {
+      this.checkOfflineRunnersSweep();
+    }, 15000);
+  }
+
+  /**
+   * 檢查並自動移出離線超過 3 分鐘的跑友
+   */
+  checkOfflineRunnersSweep() {
+    const now = Date.now();
+    const THREE_MINUTES_MS = 3 * 60 * 1000; // 3 分鐘
+
+    for (const [runnerId, runner] of this.cachedRunners.entries()) {
+      if (runnerId === this.selfRunner.id) continue;
+
+      const lastActive = runner.updatedAt || runner.lastSeen || runner.joinedAt || 0;
+      const isOverdue = (now - lastActive) > THREE_MINUTES_MS;
+      const isOfflineTimeout = (runner.isOnline === false) && ((now - (runner.lastSeen || lastActive)) > THREE_MINUTES_MS);
+
+      if (isOverdue || isOfflineTimeout) {
+        console.log(`[App] 跑友 ${runner.name} (${runnerId}) 已離線超過 3 分鐘，自動退出隊伍`);
+        
+        // 若自己是隊長，自 Firebase Realtime Database 移除該節點
+        if (this.selfRunner && this.selfRunner.isCaptain) {
+          firebaseService.kickRunner(this.roomId, runnerId);
+        } else {
+          // 一般隊友端本機立即移除
+          this.handleRunnerRemoved(runnerId);
+        }
+
+        uiController.showToast(`跑友「${runner.name || '跑友'}」離線已滿 3 分鐘，已自動移出小隊`, 'info');
+      }
+    }
   }
 
   subscribeRoomRunners() {
@@ -637,6 +692,7 @@ class App {
   }
 
   handleRunnerUpdated(runnerId, runnerData) {
+    this.cachedRunners.set(runnerId, runnerData);
     const isSelf = runnerId === this.selfRunner.id;
     mapRenderer.updateRunner(runnerId, runnerData, isSelf);
     uiController.upsertRunner(
@@ -655,10 +711,11 @@ class App {
   }
 
   handleRunnerRemoved(runnerId) {
-    // 若自己被隊長移出小隊
+    this.cachedRunners.delete(runnerId);
+    // 若自己被隊長移出小隊或離線超時
     if (runnerId === this.selfRunner.id) {
       geolocationService.stopTracking();
-      uiController.showToast('⚠️ 您已被隊長移出小隊', 'warning');
+      uiController.showToast('⚠️ 您已離開或被移出小隊', 'warning');
       setTimeout(() => {
         window.location.href = window.location.origin + window.location.pathname;
       }, 1500);

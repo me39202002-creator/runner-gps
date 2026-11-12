@@ -267,6 +267,23 @@ class FirebaseService {
   }
 
   /**
+   * 發送線上心跳包 (Heartbeat)，防止靜止休息時被誤判超時
+   */
+  async sendHeartbeat() {
+    if (!this.db || !this.currentRoomId || !this.currentRunnerId) return;
+    const myRunnerRef = ref(this.db, `rooms/${this.currentRoomId}/runners/${this.currentRunnerId}`);
+    try {
+      await update(myRunnerRef, {
+        isOnline: true,
+        lastSeen: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {
+      // 斷線時忽略
+    }
+  }
+
+  /**
    * 隊長將特定跑友移出小隊
    * @param {string} roomId 
    * @param {string} runnerId 
