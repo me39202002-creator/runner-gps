@@ -28,6 +28,7 @@ class FirebaseService {
     this.currentRoomId = null;
     this.currentRunnerId = null;
     this.runnersRef = null;
+    this.metaRef = null;
     this.connectedRef = null;
     this.isInitialized = false;
     this.isConnected = false;
@@ -153,8 +154,12 @@ class FirebaseService {
    */
   subscribeToRoomMetadata(roomId, onMetadataUpdated) {
     if (!this.db) return;
-    const metaRef = ref(this.db, `rooms/${roomId}/metadata`);
-    onValue(metaRef, (snapshot) => {
+    if (this.metaRef) {
+      off(this.metaRef);
+      this.metaRef = null;
+    }
+    this.metaRef = ref(this.db, `rooms/${roomId}/metadata`);
+    onValue(this.metaRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         if (typeof onMetadataUpdated === 'function') {
@@ -316,12 +321,16 @@ class FirebaseService {
   }
 
   /**
-   * 取消資料庫監聽
+   * 取消資料庫監聽 (完整釋放舊房間監聽)
    */
   unsubscribe() {
     if (this.runnersRef) {
       off(this.runnersRef);
       this.runnersRef = null;
+    }
+    if (this.metaRef) {
+      off(this.metaRef);
+      this.metaRef = null;
     }
     this.onRunnerUpdatedCallback = null;
     this.onRunnerRemovedCallback = null;

@@ -246,6 +246,14 @@ class UIController {
   }
 
   /**
+   * 清空本地所有暫存跑友清單 (房間隔離)
+   */
+  clearAllRunners() {
+    this.cachedRunners.clear();
+    this.refreshDashboard(null, null, false);
+  }
+
+  /**
    * 刷新排行榜與三大統計數據卡片 (安全 DOM 渲染)
    */
   refreshDashboard(onFocusRunner, onKickRunner = null, isCaptain = false) {
