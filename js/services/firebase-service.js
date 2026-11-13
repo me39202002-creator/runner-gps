@@ -97,17 +97,26 @@ class FirebaseService {
     const snapshot = await get(metaRef);
 
     if (!snapshot.exists()) {
-      // 房間尚不存在，建立新房間並儲存名稱與密碼
+      // 房間尚不存在，建立新房間，第一位加入者即為唯一隊長
       const metadata = {
         name: roomName || '跑友即時小隊',
         password: password || null,
         hasPassword: !!password,
+        captainId: runnerInfo.id,
         creatorId: runnerInfo.id,
         createdAt: serverTimestamp()
       };
       await set(metaRef, metadata);
+      runnerInfo.isCaptain = true;
       await this.joinRoom(roomId, runnerInfo);
-      return { success: true, isNewRoom: true, roomName: metadata.name, hasPassword: metadata.hasPassword };
+      return {
+        success: true,
+        isNewRoom: true,
+        roomName: metadata.name,
+        hasPassword: metadata.hasPassword,
+        captainId: runnerInfo.id,
+        isCaptain: true
+      };
     } else {
       // 房間已存在，檢查是否需要密碼
       const metadata = snapshot.val();
@@ -132,12 +141,45 @@ class FirebaseService {
         }
       }
 
+      // 嚴格判定隊長身份：隊長只有一人，先加入的是隊長
+      let currentCaptainId = metadata.captainId || metadata.creatorId;
+
+      // 若資料庫尚未指定 captainId，或原本隊長已不在房間，檢查房間內最早加入的在線跑友
+      const runnersSnap = await get(ref(this.db, `rooms/${roomId}/runners`));
+      const existingRunners = runnersSnap.exists() ? runnersSnap.val() : {};
+
+      if (!currentCaptainId || !existingRunners[currentCaptainId]) {
+        let earliestJoinedTime = Infinity;
+        let earliestRunnerId = null;
+
+        Object.entries(existingRunners).forEach(([rid, r]) => {
+          if (r.isOnline !== false) {
+            const jt = r.joinedAt || r.createdAt || Infinity;
+            if (jt < earliestJoinedTime) {
+              earliestJoinedTime = jt;
+              earliestRunnerId = rid;
+            }
+          }
+        });
+
+        // 若無其他在線跑友，則此人就是最早也是唯一的隊長
+        currentCaptainId = earliestRunnerId || runnerInfo.id;
+        try {
+          await update(metaRef, { captainId: currentCaptainId });
+        } catch (e) {}
+      }
+
+      const isCaptain = (currentCaptainId === runnerInfo.id);
+      runnerInfo.isCaptain = isCaptain;
+
       await this.joinRoom(roomId, runnerInfo);
       return {
         success: true,
         isNewRoom: false,
         roomName: metadata.name || roomName,
-        hasPassword: metadata.hasPassword
+        hasPassword: metadata.hasPassword,
+        captainId: currentCaptainId,
+        isCaptain: isCaptain
       };
     }
   }
@@ -207,6 +249,7 @@ class FirebaseService {
       color: runnerInfo.color,
       avatar: runnerInfo.avatar || '🏃',
       isOnline: true,
+      isCaptain: !!runnerInfo.isCaptain,
       joinedAt: serverTimestamp(),
       lastSeen: serverTimestamp()
     };
@@ -314,13 +357,46 @@ class FirebaseService {
    */
   async leaveRoom() {
     if (this.db && this.currentRoomId && this.currentRunnerId) {
-      const myRunnerRef = ref(this.db, `rooms/${this.currentRoomId}/runners/${this.currentRunnerId}`);
+      const roomId = this.currentRoomId;
+      const runnerId = this.currentRunnerId;
+      const myRunnerRef = ref(this.db, `rooms/${roomId}/runners/${runnerId}`);
       try {
         await onDisconnect(myRunnerRef).cancel();
         await update(myRunnerRef, {
           isOnline: false,
           lastSeen: serverTimestamp()
         });
+
+        // 隊長傳承機制：若退出的正是隊長，自動傳承給下一個最早加入的在線跑友
+        const metaRef = ref(this.db, `rooms/${roomId}/metadata`);
+        const metaSnap = await get(metaRef);
+        if (metaSnap.exists()) {
+          const meta = metaSnap.val();
+          if (meta.captainId === runnerId) {
+            const runnersSnap = await get(ref(this.db, `rooms/${roomId}/runners`));
+            if (runnersSnap.exists()) {
+              const allRunners = runnersSnap.val();
+              let nextCaptainId = null;
+              let earliestTime = Infinity;
+
+              Object.entries(allRunners).forEach(([rid, r]) => {
+                if (rid !== runnerId && r.isOnline !== false) {
+                  const jt = r.joinedAt || r.createdAt || Infinity;
+                  if (jt < earliestTime) {
+                    earliestTime = jt;
+                    nextCaptainId = rid;
+                  }
+                }
+              });
+
+              if (nextCaptainId) {
+                await update(metaRef, { captainId: nextCaptainId });
+                await update(ref(this.db, `rooms/${roomId}/runners/${nextCaptainId}`), { isCaptain: true });
+                console.log(`[FirebaseService] 隊長已傳承給最早加入的隊友: ${nextCaptainId}`);
+              }
+            }
+          }
+        }
       } catch (err) {
         console.warn('[FirebaseService] 離線狀態註記錯誤:', err);
       }

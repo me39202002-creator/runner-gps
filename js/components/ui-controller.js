@@ -241,16 +241,40 @@ class UIController {
   }
 
   /**
-   * 更新跑友或新增
+   * 更新使用者角色標籤 (隊長 / 隊友)
    */
-  upsertRunner(runnerId, runnerData, onFocusRunner, onKickRunner = null, isCaptain = false) {
-    this.cachedRunners.set(runnerId, runnerData);
-    this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain);
+  updateRole(isCaptain) {
+    if (this.elements.roleBadge) {
+      if (isCaptain) {
+        this.elements.roleBadge.textContent = '👑 隊長';
+        this.elements.roleBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold border border-amber-500/40 text-[11px]';
+      } else {
+        this.elements.roleBadge.textContent = '🏃 隊友';
+        this.elements.roleBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-bold border border-teal-500/40 text-[11px]';
+      }
+    }
+    if (this.elements.captainBadge) {
+      if (isCaptain) {
+        this.elements.captainBadge.textContent = '你是隊長';
+        this.elements.captainBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950';
+      } else {
+        this.elements.captainBadge.textContent = '隊友';
+        this.elements.captainBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-teal-400 border border-slate-700';
+      }
+    }
   }
 
-  removeRunner(runnerId, onFocusRunner, onKickRunner = null, isCaptain = false) {
+  /**
+   * 更新跑友或新增
+   */
+  upsertRunner(runnerId, runnerData, onFocusRunner, onKickRunner = null, isCaptain = false, captainId = null) {
+    this.cachedRunners.set(runnerId, runnerData);
+    this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain, captainId);
+  }
+
+  removeRunner(runnerId, onFocusRunner, onKickRunner = null, isCaptain = false, captainId = null) {
     this.cachedRunners.delete(runnerId);
-    this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain);
+    this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain, captainId);
   }
 
   /**
@@ -270,7 +294,7 @@ class UIController {
   /**
    * 刷新排行榜與三大統計數據卡片 (安全 DOM 渲染)
    */
-  refreshDashboard(onFocusRunner, onKickRunner = null, isCaptain = false) {
+  refreshDashboard(onFocusRunner, onKickRunner = null, isCaptain = false, captainId = null) {
     const list = Array.from(this.cachedRunners.entries());
     const totalCount = list.length;
     const onlineCount = list.filter(([_, r]) => r.isOnline !== false).length;
@@ -319,12 +343,28 @@ class UIController {
 
     list.forEach(([id, runner], idx) => {
       const isSelf = id === this.selfRunnerId;
+      const isThisRunnerCaptain = captainId ? (id === captainId) : !!runner.isCaptain;
       const isOnline = runner.isOnline !== false;
       const speed = runner.speed || 0;
       const kmh = (speed * 3.6).toFixed(1);
       const pace = formatPace(speed).replace(' /km', '');
       const distKm = ((runner.totalDistanceMeters || 0) / 1000).toFixed(1);
       const batteryStr = runner.battery != null ? `🔋 ${runner.battery}%` : '🔋 100%';
+
+      let roleBadge;
+      if (isSelf) {
+        if (isThisRunnerCaptain) {
+          roleBadge = createSafeElement('span', { class: 'text-[10px] font-bold px-1.5 py-0.2 bg-amber-400 text-slate-950 rounded' }, '👑 隊長 (我)');
+        } else {
+          roleBadge = createSafeElement('span', { class: 'text-[10px] font-medium px-1.5 py-0.2 bg-teal-500/20 text-teal-300 rounded border border-teal-500/40' }, '🏃 隊友 (我)');
+        }
+      } else {
+        if (isThisRunnerCaptain) {
+          roleBadge = createSafeElement('span', { class: 'text-[10px] font-bold px-1.5 py-0.2 bg-amber-400 text-slate-950 rounded' }, '👑 隊長');
+        } else {
+          roleBadge = createSafeElement('span', { class: 'text-[10px] font-medium px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded' }, '跑友');
+        }
+      }
 
       const card = createSafeElement('div', {
         class: `p-3 rounded-2xl border transition flex items-center justify-between gap-3 cursor-pointer ${
@@ -357,9 +397,7 @@ class UIController {
           createSafeElement('div', { class: 'min-w-0' }, [
             createSafeElement('div', { class: 'flex items-center gap-1.5' }, [
               createSafeElement('span', { class: 'font-bold text-white text-xs truncate' }, runner.name || '熱血跑友'),
-              isSelf
-                ? createSafeElement('span', { class: 'text-[10px] font-bold px-1.5 py-0.2 bg-amber-400 text-slate-950 rounded' }, '👑 隊長 (我)')
-                : createSafeElement('span', { class: 'text-[10px] font-medium px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded' }, '跑友')
+              roleBadge
             ]),
             createSafeElement('div', { class: 'flex items-center gap-2 text-[11px] text-slate-400 mt-0.5' }, [
               createSafeElement('span', { class: 'text-amber-400 font-medium' }, `● 節奏快跑 ${kmh} km/h`),

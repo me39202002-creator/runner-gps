@@ -30,6 +30,7 @@ class App {
     this.roomPassword = null;
     this.hasRoomPassword = false;
     this.selfRunner = null;
+    this.captainId = null;
     this.isTracking = false;
     this.latestSelfCoords = null;
     this.cachedRunners = new Map();
@@ -102,18 +103,18 @@ class App {
         const parsed = JSON.parse(saved);
         this.selfRunner = {
           id: parsed.id || generateSafeRunnerId(),
-          name: sanitizeRunnerName(parsed.name, isInvitedTeammate ? '熱血隊友' : '小明隊長'),
+          name: sanitizeRunnerName(parsed.name, '熱血跑友'),
           avatar: parsed.avatar || (isInvitedTeammate ? '🏃‍♀️' : '🏃‍♂️'),
           color: sanitizeColor(parsed.color, '#05D5A4'),
-          isCaptain: isInvitedTeammate ? false : (parsed.isCaptain ?? true)
+          isCaptain: false // 隊長由房間入隊順序判定，先加入者為唯一隊長
         };
       } else {
         this.selfRunner = {
           id: generateSafeRunnerId(),
-          name: isInvitedTeammate ? '熱血隊友' : '小明隊長',
+          name: isInvitedTeammate ? '熱血隊友' : '熱血跑友',
           avatar: isInvitedTeammate ? '🏃‍♀️' : '🏃‍♂️',
           color: '#05D5A4',
-          isCaptain: !isInvitedTeammate
+          isCaptain: false
         };
         // 第一次透過分享連結加入的隊友，自動提示設定專屬暱稱
         if (isInvitedTeammate) {
@@ -125,10 +126,10 @@ class App {
     } catch (e) {
       this.selfRunner = {
         id: generateSafeRunnerId(),
-        name: isInvitedTeammate ? '熱血隊友' : '小明隊長',
+        name: isInvitedTeammate ? '熱血隊友' : '熱血跑友',
         avatar: '🏃‍♂️',
         color: '#05D5A4',
-        isCaptain: !isInvitedTeammate
+        isCaptain: false
       };
     }
   }
@@ -635,7 +636,8 @@ class App {
         updatedData,
         (id, r) => this.handleFocusRunner(id, r),
         (id, r) => this.handleKickRunner(id, r),
-        this.selfRunner.isCaptain
+        this.selfRunner.isCaptain,
+        this.captainId
       );
     }
 
@@ -783,6 +785,13 @@ class App {
                 uiController.closePasswordModal();
                 this.roomName = retryRes.roomName || this.roomName;
                 this.hasRoomPassword = retryRes.hasPassword;
+                if (retryRes.captainId) {
+                  this.captainId = retryRes.captainId;
+                  this.selfRunner.isCaptain = !!retryRes.isCaptain;
+                  this.saveProfile();
+                  uiController.updateRole(this.selfRunner.isCaptain);
+                  uiController.updateSelfStrip(this.selfRunner);
+                }
                 uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
                 uiController.showToast(`密碼正確！已進入 [${this.roomName}]`, 'success');
                 this.subscribeRoomRunners();
@@ -803,6 +812,13 @@ class App {
         } else if (this.roomName && this.roomName !== '跑友即時小隊') {
           // 若本機有自訂名稱，但 Firebase 還是預設名稱，立即同步至 Firebase
           await firebaseService.updateRoomMetadata(this.roomId, this.roomName, this.roomPassword);
+        }
+        if (joinRes.captainId) {
+          this.captainId = joinRes.captainId;
+          this.selfRunner.isCaptain = !!joinRes.isCaptain;
+          this.saveProfile();
+          uiController.updateRole(this.selfRunner.isCaptain);
+          uiController.updateSelfStrip(this.selfRunner);
         }
         this.hasRoomPassword = joinRes.hasPassword;
         uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
@@ -882,13 +898,33 @@ class App {
       }
     );
 
-    // 監聽小隊名稱與密碼變更 (全體跑友同步更新)
+    // 監聽小隊名稱、密碼與隊長身份變更 (全體跑友同步更新)
     firebaseService.subscribeToRoomMetadata(this.roomId, (meta) => {
-      if (meta && meta.name) {
-        this.roomName = meta.name;
-        this.hasRoomPassword = !!meta.hasPassword;
-        localStorage.setItem('runner_gps_room_name', this.roomName);
-        uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
+      if (meta) {
+        if (meta.name) {
+          this.roomName = meta.name;
+          this.hasRoomPassword = !!meta.hasPassword;
+          localStorage.setItem('runner_gps_room_name', this.roomName);
+          uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
+        }
+        if (meta.captainId) {
+          this.captainId = meta.captainId;
+          const wasCaptain = this.selfRunner.isCaptain;
+          const nowCaptain = (this.selfRunner.id === meta.captainId);
+          this.selfRunner.isCaptain = nowCaptain;
+          this.saveProfile();
+          if (wasCaptain !== nowCaptain) {
+            uiController.showToast(nowCaptain ? '👑 您已成為本小隊隊長！' : '🏃 您目前為小隊隊友', 'info');
+          }
+          uiController.updateRole(this.selfRunner.isCaptain);
+          uiController.updateSelfStrip(this.selfRunner);
+          uiController.refreshDashboard(
+            (id, r) => this.handleFocusRunner(id, r),
+            (id, r) => this.handleKickRunner(id, r),
+            this.selfRunner.isCaptain,
+            this.captainId
+          );
+        }
       }
     });
   }
@@ -938,7 +974,8 @@ class App {
       selfData,
       (id, r) => this.handleFocusRunner(id, r),
       (id, r) => this.handleKickRunner(id, r),
-      this.selfRunner.isCaptain
+      this.selfRunner.isCaptain,
+      this.captainId
     );
     uiController.updateSelfStrip(selfData);
 
@@ -963,7 +1000,8 @@ class App {
       runnerData,
       (id, r) => this.handleFocusRunner(id, r),
       (id, r) => this.handleKickRunner(id, r),
-      this.selfRunner.isCaptain
+      this.selfRunner.isCaptain,
+      this.captainId
     );
 
     if (isSelf) {
@@ -986,7 +1024,7 @@ class App {
       if (mapRenderer && mapRenderer.runners) {
         mapRenderer.runners.forEach((r, id) => mapRenderer.removeRunner(id));
       }
-      uiController.refreshDashboard(null, null, false);
+      uiController.refreshDashboard(null, null, false, null);
 
       uiController.showToast('⚠️ 您已被隊長移出小隊，需要重新加入才能進入！', 'error');
 
@@ -1004,7 +1042,8 @@ class App {
       runnerId,
       (id, r) => this.handleFocusRunner(id, r),
       (id, r) => this.handleKickRunner(id, r),
-      this.selfRunner.isCaptain
+      this.selfRunner.isCaptain,
+      this.captainId
     );
   }
 
