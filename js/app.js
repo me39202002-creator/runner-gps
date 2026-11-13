@@ -273,19 +273,36 @@ class App {
 
     // 系統與小隊綜合設定彈窗
     const openSettingsModal = (focusField = null) => {
-      uiController.openCaptainSettingsModal(this.roomName, this.roomId, this.roomPassword, this.selfRunner);
-      if (focusField === 'teamName') {
+      uiController.openCaptainSettingsModal(
+        this.roomName,
+        this.roomId,
+        this.roomPassword,
+        this.selfRunner,
+        this.selfRunner.isCaptain
+      );
+
+      if (this.selfRunner.isCaptain) {
+        if (focusField === 'teamName') {
+          setTimeout(() => {
+            if (el.inputCaptainTeamName) {
+              el.inputCaptainTeamName.focus();
+              el.inputCaptainTeamName.select();
+            }
+          }, 100);
+        } else if (focusField === 'teamCode') {
+          setTimeout(() => {
+            if (el.inputCaptainTeamCode) {
+              el.inputCaptainTeamCode.focus();
+              el.inputCaptainTeamCode.select();
+            }
+          }, 100);
+        }
+      } else {
+        // 隊員開啟設定彈窗時，自動定位並聚焦至個人跑友名片暱稱輸入框
         setTimeout(() => {
-          if (el.inputCaptainTeamName) {
-            el.inputCaptainTeamName.focus();
-            el.inputCaptainTeamName.select();
-          }
-        }, 100);
-      } else if (focusField === 'teamCode') {
-        setTimeout(() => {
-          if (el.inputCaptainTeamCode) {
-            el.inputCaptainTeamCode.focus();
-            el.inputCaptainTeamCode.select();
+          if (el.settingsRunnerName) {
+            el.settingsRunnerName.focus();
+            el.settingsRunnerName.select();
           }
         }, 100);
       }
@@ -537,9 +554,14 @@ class App {
   }
 
   /**
-   * 隊長儲存小隊權限設定 (名稱、代碼、密碼)
+   * 隊長儲存小隊權限設定 (名稱、代碼、密碼) - 嚴格限制僅隊長可執行
    */
   async handleSaveCaptainSettings() {
+    if (!this.selfRunner || !this.selfRunner.isCaptain) {
+      uiController.showToast('⚠️ 只有小隊隊長有權修改小隊房間設定！隊員僅可更改個人跑友名片', 'warning');
+      return;
+    }
+
     const el = uiController.elements;
     const rawName = el.inputCaptainTeamName ? el.inputCaptainTeamName.value : '';
     const rawCode = el.inputCaptainTeamCode ? el.inputCaptainTeamCode.value : '';

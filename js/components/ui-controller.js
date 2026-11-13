@@ -107,6 +107,8 @@ class UIController {
       inputCaptainTeamPwd: document.getElementById('input-captain-team-pwd'),
       btnCaptainClearPwd: document.getElementById('btn-captain-clear-pwd'),
       btnSaveCaptainSettings: document.getElementById('btn-save-captain-settings'),
+      settingsTeamPermBadge: document.getElementById('settings-team-perm-badge'),
+      settingsTeamTeammateNotice: document.getElementById('settings-team-teammate-notice'),
       btnTopSettings: document.getElementById('btn-top-settings'),
       btnTopSettingsMobile: document.getElementById('btn-top-settings-mobile'),
       btnClearAppCache: document.getElementById('btn-clear-app-cache'),
@@ -261,6 +263,10 @@ class UIController {
         this.elements.captainBadge.textContent = '隊友';
         this.elements.captainBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-teal-400 border border-slate-700';
       }
+    }
+    const dashPencil = document.getElementById('dash-team-title-pencil');
+    if (dashPencil) {
+      dashPencil.textContent = isCaptain ? '✏️' : '🔒';
     }
   }
 
@@ -670,21 +676,84 @@ class UIController {
 
   /**
    * 隊長專屬小隊設定彈窗開關 (綜合設定彈窗)
+   * 僅隊長有權修改小隊名稱與房間設定；隊友僅能修改個人跑友名片
    */
-  openCaptainSettingsModal(roomName, roomCode, roomPwd, runnerProfile = null) {
+  openCaptainSettingsModal(roomName, roomCode, roomPwd, runnerProfile = null, isCaptain = false) {
     if (!this.elements.captainSettingsModal) return;
     this.elements.captainSettingsModal.classList.remove('hidden');
+
+    const amICaptain = isCaptain || !!runnerProfile?.isCaptain;
+
+    // 小隊名稱欄位
     if (this.elements.inputCaptainTeamName) {
       this.elements.inputCaptainTeamName.value = roomName || '跑友即時小隊';
-    }
-    if (this.elements.inputCaptainTeamCode) {
-      this.elements.inputCaptainTeamCode.value = roomCode || 'RUN-888';
-    }
-    if (this.elements.inputCaptainTeamPwd) {
-      this.elements.inputCaptainTeamPwd.value = roomPwd || '';
+      this.elements.inputCaptainTeamName.disabled = !amICaptain;
+      if (!amICaptain) {
+        this.elements.inputCaptainTeamName.classList.add('opacity-60', 'cursor-not-allowed', 'bg-[#0f172a]');
+      } else {
+        this.elements.inputCaptainTeamName.classList.remove('opacity-60', 'cursor-not-allowed', 'bg-[#0f172a]');
+      }
     }
 
-    // 填充個人資料設定
+    // 小隊代碼欄位
+    if (this.elements.inputCaptainTeamCode) {
+      this.elements.inputCaptainTeamCode.value = roomCode || 'RUN-888';
+      this.elements.inputCaptainTeamCode.disabled = !amICaptain;
+      if (!amICaptain) {
+        this.elements.inputCaptainTeamCode.classList.add('opacity-60', 'cursor-not-allowed', 'bg-[#0f172a]');
+      } else {
+        this.elements.inputCaptainTeamCode.classList.remove('opacity-60', 'cursor-not-allowed', 'bg-[#0f172a]');
+      }
+    }
+
+    // 入隊密碼欄位
+    if (this.elements.inputCaptainTeamPwd) {
+      this.elements.inputCaptainTeamPwd.value = roomPwd || '';
+      this.elements.inputCaptainTeamPwd.disabled = !amICaptain;
+      if (!amICaptain) {
+        this.elements.inputCaptainTeamPwd.classList.add('opacity-60', 'cursor-not-allowed', 'bg-[#0f172a]');
+      } else {
+        this.elements.inputCaptainTeamPwd.classList.remove('opacity-60', 'cursor-not-allowed', 'bg-[#0f172a]');
+      }
+    }
+
+    // 免密碼與儲存小隊設定按鈕（僅隊長可見）
+    if (this.elements.btnCaptainClearPwd) {
+      if (amICaptain) {
+        this.elements.btnCaptainClearPwd.classList.remove('hidden');
+      } else {
+        this.elements.btnCaptainClearPwd.classList.add('hidden');
+      }
+    }
+    if (this.elements.btnSaveCaptainSettings) {
+      if (amICaptain) {
+        this.elements.btnSaveCaptainSettings.classList.remove('hidden');
+      } else {
+        this.elements.btnSaveCaptainSettings.classList.add('hidden');
+      }
+    }
+
+    // 隊友唯讀提示條
+    if (this.elements.settingsTeamTeammateNotice) {
+      if (amICaptain) {
+        this.elements.settingsTeamTeammateNotice.classList.add('hidden');
+      } else {
+        this.elements.settingsTeamTeammateNotice.classList.remove('hidden');
+      }
+    }
+
+    // 權限徽章
+    if (this.elements.settingsTeamPermBadge) {
+      if (amICaptain) {
+        this.elements.settingsTeamPermBadge.textContent = '👑 隊長權限';
+        this.elements.settingsTeamPermBadge.className = 'text-[10px] text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded font-normal ml-auto border border-amber-500/30';
+      } else {
+        this.elements.settingsTeamPermBadge.textContent = '🔒 僅隊長可修改 (隊友唯讀)';
+        this.elements.settingsTeamPermBadge.className = 'text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded font-normal ml-auto border border-slate-700';
+      }
+    }
+
+    // 填充個人資料設定 (全體跑友皆可修改)
     if (runnerProfile) {
       if (this.elements.settingsRunnerName) {
         this.elements.settingsRunnerName.value = runnerProfile.name || '';

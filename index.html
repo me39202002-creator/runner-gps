@@ -259,9 +259,9 @@
           </div>
           <div>
             <div class="flex items-center gap-1.5 flex-wrap">
-              <button id="dash-team-title-btn" type="button" class="text-sm sm:text-base font-bold text-white hover:text-teal-300 transition flex items-center gap-1.5 text-left active:scale-95" title="點擊直接修改小隊名稱">
+              <button id="dash-team-title-btn" type="button" class="text-sm sm:text-base font-bold text-white hover:text-teal-300 transition flex items-center gap-1.5 text-left active:scale-95" title="點擊檢視或修改小隊設定">
                 <span id="dash-team-title">跑友即時小隊</span>
-                <span class="text-xs text-amber-400">✏️</span>
+                <span id="dash-team-title-pencil" class="text-xs text-amber-400">✏️</span>
               </button>
               <span id="captain-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950">你是隊長</span>
               <button id="btn-open-captain-settings" type="button" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition flex items-center gap-1" title="開啟小隊與系統設定">
@@ -477,12 +477,18 @@
         <button id="btn-close-captain-settings" type="button" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition">✕</button>
       </div>
 
-      <!-- 區塊一：小隊與房間設定 -->
-      <div class="bg-[#18263E] border border-amber-500/40 rounded-2xl p-3.5 sm:p-4 space-y-3">
+      <!-- 區塊一：小隊與房間設定 (僅隊長有權修改) -->
+      <div id="settings-team-section" class="bg-[#18263E] border border-amber-500/40 rounded-2xl p-3.5 sm:p-4 space-y-3">
         <div class="flex items-center gap-1.5 text-xs font-bold text-amber-400">
           <span>👑</span>
-          <span>小隊房間設定</span>
-          <span class="text-[10px] text-slate-400 font-normal ml-auto">同步更新全體隊友</span>
+          <span id="settings-team-section-title">小隊房間設定</span>
+          <span id="settings-team-perm-badge" class="text-[10px] text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded font-normal ml-auto border border-amber-500/30">👑 隊長權限</span>
+        </div>
+
+        <!-- 隊友唯讀提示條 (若非隊長時顯示) -->
+        <div id="settings-team-teammate-notice" class="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 text-[11px] hidden flex items-center gap-2">
+          <span class="text-amber-400">🔒</span>
+          <span>您是小隊隊友，僅隊長具備修改房間名稱、代碼與密碼之權限。您可於下方修改您的個人跑友名片！</span>
         </div>
 
         <div class="space-y-2.5 text-xs">
@@ -640,6 +646,6 @@
   <div id="toast-container" class="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none px-4 w-full max-w-sm"></div>
 
   <!-- 載入核心模組 (含快取破除參數) -->
-  <script type="module" src="js/app.js?v=20261113_4"></script>
+  <script type="module" src="js/app.js?v=20261113_5"></script>
 </body>
 </html>
