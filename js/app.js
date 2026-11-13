@@ -10,6 +10,7 @@ import { getAppConfig, saveCustomConfig } from './config.js';
 import {
   validateAndSanitizeRoomId,
   generateSafeRoomId,
+  generateRandomRoomCode,
   generateSafeRunnerId,
   sanitizeRunnerName,
   sanitizeRoomName,
@@ -25,7 +26,7 @@ import { uiController } from './components/ui-controller.js';
 class App {
   constructor() {
     this.config = getAppConfig();
-    this.roomId = localStorage.getItem('runner_gps_room_id') || 'RUN-888';
+    this.roomId = localStorage.getItem('runner_gps_room_id') || generateRandomRoomCode();
     this.roomName = localStorage.getItem('runner_gps_room_name') || '跑友即時小隊';
     this.roomPassword = null;
     this.hasRoomPassword = false;
@@ -55,6 +56,9 @@ class App {
       const savedRoomId = localStorage.getItem('runner_gps_room_id');
       if (savedRoomId && validateAndSanitizeRoomId(savedRoomId)) {
         this.roomId = savedRoomId;
+      } else {
+        this.roomId = generateRandomRoomCode();
+        localStorage.setItem('runner_gps_room_id', this.roomId);
       }
     }
 
@@ -460,26 +464,38 @@ class App {
         console.warn('退出房間出錯:', e);
       }
 
-      // 標記為未加入狀態
+      // 產生隨機小隊代碼：3 個大寫英文字母加上 3 個數字 (如 ABC-123, ZZZ-456)
+      const newRandomRoom = generateRandomRoomCode();
+      this.roomId = newRandomRoom;
+      this.roomName = '跑友即時小隊';
+      this.roomPassword = null;
+      this.hasRoomPassword = false;
+      this.captainId = null;
+      this.selfRunner.isCaptain = true; // 隨機新房間的第一人自動成為隊長
+
+      // 標記為未加入狀態並儲存新隨機代碼至本機
+      localStorage.setItem('runner_gps_room_id', this.roomId);
+      localStorage.setItem('runner_gps_room_name', this.roomName);
       localStorage.setItem('runner_gps_has_joined', 'false');
 
       // 清除本地跑友暫存與地圖標記
       this.cachedRunners.clear();
       this.latestSelfCoords = null;
       if (mapRenderer && mapRenderer.runners) {
-        mapRenderer.runners.forEach((r, id) => mapRenderer.removeRunner(id));
+        mapRenderer.clearAllRunners(false);
       }
-      uiController.refreshDashboard(null, null, false);
+      uiController.clearRunners(false);
+      uiController.refreshDashboard(null, null, false, null);
+      uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
+      uiController.updateRole(this.selfRunner.isCaptain);
 
       // 清除網址上的房間與密碼參數
       const cleanUrl = new URL(window.location.origin + window.location.pathname);
       window.history.replaceState({}, '', cleanUrl.toString());
 
-      // 彈出加入小隊彈窗，強制使用者必須點擊「儲存並加入小隊」才能再次進入
-      if (uiController.elements.inputRoomId) uiController.elements.inputRoomId.value = this.roomId;
-      if (uiController.elements.inputRunnerName) uiController.elements.inputRunnerName.value = this.selfRunner.name;
-      uiController.toggleJoinModal(true);
-      uiController.showToast('已退出小隊。需重新輸入小隊代碼並點擊加入才能進入！', 'info');
+      // 自動開啟小隊設定彈窗，顯示新的隨機小隊代碼供使用者確認或修改
+      uiController.openCaptainSettingsModal(this.roomName, this.roomId, this.roomPassword, this.selfRunner, true);
+      uiController.showToast(`已退出小隊！新隨機小隊代碼已生成：[${this.roomId}]`, 'success');
     };
 
     const btnHeaderLeave = document.getElementById('btn-header-leave-team');
@@ -1037,24 +1053,41 @@ class App {
     // 若自己被隊長移出小隊
     if (runnerId === this.selfRunner.id) {
       geolocationService.stopTracking();
-      // 標記為未加入狀態
+
+      // 隨機生成 3 個大寫英文字母加上 3 個數字代碼 (如 ABC-123)
+      const newRandomRoom = generateRandomRoomCode();
+      this.roomId = newRandomRoom;
+      this.roomName = '跑友即時小隊';
+      this.roomPassword = null;
+      this.hasRoomPassword = false;
+      this.captainId = null;
+      this.selfRunner.isCaptain = true;
+
+      // 標記為未加入狀態並儲存新隨機代碼至本機
+      localStorage.setItem('runner_gps_room_id', this.roomId);
+      localStorage.setItem('runner_gps_room_name', this.roomName);
       localStorage.setItem('runner_gps_has_joined', 'false');
 
       // 清除本地跑友暫存與地圖標記
       this.cachedRunners.clear();
       this.latestSelfCoords = null;
       if (mapRenderer && mapRenderer.runners) {
-        mapRenderer.runners.forEach((r, id) => mapRenderer.removeRunner(id));
+        mapRenderer.clearAllRunners(false);
       }
+      uiController.clearRunners(false);
       uiController.refreshDashboard(null, null, false, null);
+      uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
+      uiController.updateRole(this.selfRunner.isCaptain);
 
-      uiController.showToast('⚠️ 您已被隊長移出小隊，需要重新加入才能進入！', 'error');
+      // 清除網址參數
+      const cleanUrl = new URL(window.location.origin + window.location.pathname);
+      window.history.replaceState({}, '', cleanUrl.toString());
 
-      // 彈出加入小隊彈窗，強制重新輸入小隊代碼與密碼重新加入
+      uiController.showToast(`⚠️ 您已被隊長移出小隊，已為您隨機生成新代碼 [${this.roomId}]！`, 'error');
+
+      // 自動開啟小隊設定彈窗
       setTimeout(() => {
-        if (uiController.elements.inputRoomId) uiController.elements.inputRoomId.value = this.roomId;
-        if (uiController.elements.inputRunnerName) uiController.elements.inputRunnerName.value = this.selfRunner.name;
-        uiController.toggleJoinModal(true);
+        uiController.openCaptainSettingsModal(this.roomName, this.roomId, this.roomPassword, this.selfRunner, true);
       }, 800);
       return;
     }

@@ -91,16 +91,30 @@ export function validateAndSanitizeRoomId(rawId) {
 }
 
 /**
- * 產生隨機的安全 Room ID (以時間戳記 + 隨機字元組成)
+ * 隨機生成 3 個大寫英文字母 + 3 個數字代碼
+ * 例如：ABC-123, ZZZ-456
+ * @returns {string}
+ */
+export function generateRandomRoomCode() {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const digits = '0123456789';
+  let letterPart = '';
+  for (let i = 0; i < 3; i++) {
+    letterPart += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+  let digitPart = '';
+  for (let i = 0; i < 3; i++) {
+    digitPart += digits.charAt(Math.floor(Math.random() * digits.length));
+  }
+  return `${letterPart}-${digitPart}`;
+}
+
+/**
+ * 產生隨機的安全 Room ID (相容舊名)
  * @returns {string}
  */
 export function generateSafeRoomId() {
-  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-  let result = 'run-';
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  return generateRandomRoomCode();
 }
 
 /**
