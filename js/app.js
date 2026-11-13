@@ -83,55 +83,56 @@ class App {
     uiController.setSelfRunnerId(this.selfRunner.id);
     mapRenderer.setSelfRunnerId(this.selfRunner.id);
 
-    // 若使用者曾退出或被踢出，強制彈出加入彈窗，需重新加入才能進入小隊
+    // 若使用者曾退出或被踢出，開啟設定彈窗供確認新小隊設定
     if (needExplicitJoin) {
-      if (uiController.elements.inputRoomId) uiController.elements.inputRoomId.value = this.roomId;
-      if (uiController.elements.inputRunnerName) uiController.elements.inputRunnerName.value = this.selfRunner.name;
-      uiController.toggleJoinModal(true);
-      uiController.showToast('請確認暱稱與小隊代碼，點擊「加入小隊」進入', 'info');
-      // 先載入地圖背景，但不加入小隊與不發送座標
-      try {
-        await mapRenderer.loadGoogleMaps(this.config.googleMapsApiKey);
-        mapRenderer.initMap('map', this.config.mapDefaults);
-      } catch (e) {}
-    } else {
-      uiController.toggleJoinModal(false);
-      uiController.togglePocketMode(false);
-      await this.startServices();
+      uiController.openCaptainSettingsModal(this.roomName, this.roomId, this.roomPassword, this.selfRunner, true);
+      uiController.showToast(`已為您生成新代碼 [${this.roomId}]，暱稱「${this.selfRunner.name}」已直接套用！`, 'info');
     }
+    await this.startServices();
   }
 
+  /**
+   * 載入個人資料：優先直接套用上次儲存的專屬個人暱稱
+   */
   loadSavedProfile(isInvitedTeammate = false) {
     try {
       const saved = localStorage.getItem('runner_gps_user_profile');
+      const savedNickname = localStorage.getItem('runner_gps_saved_nickname');
+      const savedAvatar = localStorage.getItem('runner_gps_saved_avatar');
+      const savedColor = localStorage.getItem('runner_gps_saved_color');
+
       if (saved) {
         const parsed = JSON.parse(saved);
+        // 優先套用特別持久化之個人暱稱
+        const resolvedName = savedNickname || parsed.name || (isInvitedTeammate ? '熱血隊友' : '熱血跑友');
         this.selfRunner = {
           id: parsed.id || generateSafeRunnerId(),
-          name: sanitizeRunnerName(parsed.name, '熱血跑友'),
-          avatar: parsed.avatar || (isInvitedTeammate ? '🏃‍♀️' : '🏃‍♂️'),
-          color: sanitizeColor(parsed.color, '#05D5A4'),
+          name: sanitizeRunnerName(resolvedName, '熱血跑友'),
+          avatar: savedAvatar || parsed.avatar || (isInvitedTeammate ? '🏃‍♀️' : '🏃‍♂️'),
+          color: sanitizeColor(savedColor || parsed.color, '#05D5A4'),
           isCaptain: false // 隊長由房間入隊順序判定，先加入者為唯一隊長
         };
       } else {
+        const defaultName = savedNickname || (isInvitedTeammate ? '熱血隊友' : '熱血跑友');
         this.selfRunner = {
           id: generateSafeRunnerId(),
-          name: isInvitedTeammate ? '熱血隊友' : '熱血跑友',
-          avatar: isInvitedTeammate ? '🏃‍♀️' : '🏃‍♂️',
-          color: '#05D5A4',
+          name: sanitizeRunnerName(defaultName, '熱血跑友'),
+          avatar: savedAvatar || (isInvitedTeammate ? '🏃‍♀️' : '🏃‍♂️'),
+          color: sanitizeColor(savedColor, '#05D5A4'),
           isCaptain: false
         };
-        // 第一次透過分享連結加入的隊友，自動提示設定專屬暱稱
-        if (isInvitedTeammate) {
+        // 只有在從未設定過專屬暱稱且是第一次透過分享連結加入的隊友，才提示設定暱稱
+        if (isInvitedTeammate && !savedNickname) {
           setTimeout(() => {
             uiController.openNicknameModal(this.selfRunner.name, this.selfRunner.avatar, this.selfRunner.color);
           }, 800);
         }
       }
     } catch (e) {
+      const savedNickname = localStorage.getItem('runner_gps_saved_nickname');
       this.selfRunner = {
         id: generateSafeRunnerId(),
-        name: isInvitedTeammate ? '熱血隊友' : '熱血跑友',
+        name: sanitizeRunnerName(savedNickname || (isInvitedTeammate ? '熱血隊友' : '熱血跑友'), '熱血跑友'),
         avatar: '🏃‍♂️',
         color: '#05D5A4',
         isCaptain: false
@@ -139,9 +140,21 @@ class App {
     }
   }
 
+  /**
+   * 儲存個人資料並永久持久化專屬暱稱，下次開啟或加入新小隊皆直接套用
+   */
   saveProfile() {
     try {
       localStorage.setItem('runner_gps_user_profile', JSON.stringify(this.selfRunner));
+      if (this.selfRunner && this.selfRunner.name) {
+        localStorage.setItem('runner_gps_saved_nickname', this.selfRunner.name);
+      }
+      if (this.selfRunner && this.selfRunner.avatar) {
+        localStorage.setItem('runner_gps_saved_avatar', this.selfRunner.avatar);
+      }
+      if (this.selfRunner && this.selfRunner.color) {
+        localStorage.setItem('runner_gps_saved_color', this.selfRunner.color);
+      }
     } catch (e) {
       console.warn('[App] 儲存失敗', e);
     }
@@ -267,13 +280,20 @@ class App {
       });
     }
 
-    // 點擊跑者名稱可修改個人設定
+    // 點擊跑者名稱或頭像即可自訂個人暱稱與代表色 (下次直接套用)
+    const openNicknameQuickModal = () => {
+      uiController.openNicknameModal(this.selfRunner.name, this.selfRunner.avatar, this.selfRunner.color);
+    };
+
     if (el.stripRunnerName) {
       el.stripRunnerName.style.cursor = 'pointer';
-      el.stripRunnerName.title = '點擊修改跑友暱稱與代表色';
-      el.stripRunnerName.addEventListener('click', () => {
-        uiController.toggleJoinModal(true);
-      });
+      el.stripRunnerName.title = '點擊修改個人暱稱 (儲存後下次直接套用)';
+      el.stripRunnerName.addEventListener('click', openNicknameQuickModal);
+    }
+    if (el.stripRunnerAvatar) {
+      el.stripRunnerAvatar.style.cursor = 'pointer';
+      el.stripRunnerAvatar.title = '點擊修改個人頭像與暱稱';
+      el.stripRunnerAvatar.addEventListener('click', openNicknameQuickModal);
     }
 
     // 系統與小隊綜合設定彈窗
@@ -571,9 +591,10 @@ class App {
 
     try {
       await firebaseService.joinRoom(this.roomId, this.selfRunner);
-      uiController.showToast(`✅ 暱稱已更新為「${this.selfRunner.name}」！`, 'success');
+      uiController.showToast(`✅ 個人暱稱已儲存為「${this.selfRunner.name}」，下次直接套用！`, 'success');
     } catch (e) {
       console.warn('[App] 同步個人暱稱至雲端失敗:', e);
+      uiController.showToast(`✅ 個人暱稱已儲存為「${this.selfRunner.name}」，下次直接套用！`, 'success');
     }
 
     uiController.closeNicknameModal();
@@ -691,29 +712,41 @@ class App {
 
     try {
       await firebaseService.joinRoom(this.roomId, this.selfRunner);
-      uiController.showToast(`✅ 個人暱稱已更新為「${this.selfRunner.name}」！`, 'success');
+      uiController.showToast(`✅ 個人暱稱已儲存為「${this.selfRunner.name}」，下次直接套用！`, 'success');
     } catch (e) {
       console.warn('[App] 更新個人資料至雲端警告:', e);
+      uiController.showToast(`✅ 個人暱稱已儲存為「${this.selfRunner.name}」，下次直接套用！`, 'success');
     }
   }
 
   /**
    * 清除應用程式所有快取檔案、Cookie 與本地暫存並重整
+   * 智慧保留使用者設定的專屬個人暱稱，確保重整後下次直接套用
    */
   async clearAppCacheAndCookies() {
     const confirmed = confirm(
-      '⚠️ 清除快取確認：\n\n這將會清除本程式在瀏覽器中的所有快取檔案、Cookie、房間小隊紀錄與個人暫存，並重新載入最新版本。\n\n確定要立即清除並重整嗎？'
+      '⚠️ 清除快取確認：\n\n這將會清除本程式在瀏覽器中的所有快取檔案、Cookie、房間小隊紀錄並重新載入最新版本。\n您的個人專屬暱稱會完整保留，下次開啟依然直接套用。\n\n確定要立即清除並重整嗎？'
     );
     if (!confirmed) return;
 
-    uiController.showToast('🧹 正在清除快取與 Cookie...', 'info');
+    uiController.showToast('🧹 正在清除快取與 Cookie (保留個人暱稱)...', 'info');
 
     try {
+      // 備份個人專屬暱稱與頭像色彩設定
+      const savedNickname = localStorage.getItem('runner_gps_saved_nickname') || this.selfRunner?.name;
+      const savedAvatar = localStorage.getItem('runner_gps_saved_avatar') || this.selfRunner?.avatar;
+      const savedColor = localStorage.getItem('runner_gps_saved_color') || this.selfRunner?.color;
+
       // 1. 清除 LocalStorage
       localStorage.clear();
 
       // 2. 清除 SessionStorage
       sessionStorage.clear();
+
+      // 3. 還原個人專屬暱稱設定，重整後下次直接套用
+      if (savedNickname) localStorage.setItem('runner_gps_saved_nickname', savedNickname);
+      if (savedAvatar) localStorage.setItem('runner_gps_saved_avatar', savedAvatar);
+      if (savedColor) localStorage.setItem('runner_gps_saved_color', savedColor);
 
       // 3. 清除所有 Cookies
       const cookies = document.cookie.split(';');

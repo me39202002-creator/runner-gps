@@ -723,14 +723,38 @@ class UIController {
   }
 
   /**
-   * 自訂暱稱與個人化設定彈窗
+   * 自訂暱稱與個人化設定彈窗 (優先直接帶入上次儲存之個人暱稱)
    */
   openNicknameModal(currentName, currentAvatar, currentColor) {
     if (!this.elements.nicknameModal) return;
     this.elements.nicknameModal.classList.remove('hidden');
+    const savedName = localStorage.getItem('runner_gps_saved_nickname') || currentName || '熱血跑友';
     if (this.elements.inputCustomNickname) {
-      this.elements.inputCustomNickname.value = currentName || '熱血跑友';
+      this.elements.inputCustomNickname.value = savedName;
       this.elements.inputCustomNickname.focus();
+      this.elements.inputCustomNickname.select();
+    }
+    const savedAvatar = localStorage.getItem('runner_gps_saved_avatar') || currentAvatar;
+    if (this.elements.nicknameAvatarSelector && savedAvatar) {
+      this.elements.nicknameAvatarSelector.querySelectorAll('.avatar-opt').forEach((b) => {
+        if (b.dataset.avatar === savedAvatar) {
+          b.classList.remove('border-transparent');
+          b.classList.add('border-teal-400', 'bg-teal-400/10');
+        } else {
+          b.classList.remove('border-teal-400', 'bg-teal-400/10');
+          b.classList.add('border-transparent');
+        }
+      });
+    }
+    const savedColor = localStorage.getItem('runner_gps_saved_color') || currentColor;
+    if (this.elements.nicknameColorSelector && savedColor) {
+      this.elements.nicknameColorSelector.querySelectorAll('.color-opt').forEach((b) => {
+        if (b.dataset.color && b.dataset.color.toLowerCase() === savedColor.toLowerCase()) {
+          b.classList.add('ring-4', 'ring-teal-400/30');
+        } else {
+          b.classList.remove('ring-4', 'ring-teal-400/30');
+        }
+      });
     }
   }
 
@@ -819,14 +843,16 @@ class UIController {
       }
     }
 
-    // 填充個人資料設定 (全體跑友皆可修改)
+    // 填充個人資料設定 (全體跑友皆可修改，直接套用已保存的暱稱)
     if (runnerProfile) {
+      const savedName = localStorage.getItem('runner_gps_saved_nickname') || runnerProfile.name || '';
       if (this.elements.settingsRunnerName) {
-        this.elements.settingsRunnerName.value = runnerProfile.name || '';
+        this.elements.settingsRunnerName.value = savedName;
       }
-      if (this.elements.settingsAvatarSelector && runnerProfile.avatar) {
+      const savedAvatar = localStorage.getItem('runner_gps_saved_avatar') || runnerProfile.avatar;
+      if (this.elements.settingsAvatarSelector && savedAvatar) {
         this.elements.settingsAvatarSelector.querySelectorAll('.avatar-opt').forEach((b) => {
-          if (b.dataset.avatar === runnerProfile.avatar) {
+          if (b.dataset.avatar === savedAvatar) {
             b.classList.remove('border-transparent');
             b.classList.add('border-teal-400', 'bg-teal-400/10');
           } else {
@@ -835,9 +861,10 @@ class UIController {
           }
         });
       }
-      if (this.elements.settingsColorSelector && runnerProfile.color) {
+      const savedColor = localStorage.getItem('runner_gps_saved_color') || runnerProfile.color;
+      if (this.elements.settingsColorSelector && savedColor) {
         this.elements.settingsColorSelector.querySelectorAll('.color-opt').forEach((b) => {
-          if (b.dataset.color && b.dataset.color.toLowerCase() === runnerProfile.color.toLowerCase()) {
+          if (b.dataset.color && b.dataset.color.toLowerCase() === savedColor.toLowerCase()) {
             b.classList.add('ring-4', 'ring-teal-400/30');
           } else {
             b.classList.remove('ring-4', 'ring-teal-400/30');

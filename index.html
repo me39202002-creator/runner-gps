@@ -41,7 +41,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <!-- 客製化樣式 -->
-  <link rel="stylesheet" href="css/style.css?v=20261113_8">
+  <link rel="stylesheet" href="css/style.css?v=20261113_9">
 </head>
 <body class="bg-[#0A0F1D] text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
 
@@ -373,7 +373,7 @@
           </div>
           <div>
             <h3 class="text-sm sm:text-base font-bold text-white">自訂我的跑友暱稱</h3>
-            <p class="text-[10px] text-slate-400">設定專屬名字與代表色，讓隊友看見你！</p>
+            <p class="text-[10px] text-teal-400">儲存後永久保存，下次開啟或換小隊直接套用！</p>
           </div>
         </div>
         <button id="btn-close-nickname-modal" type="button" class="text-slate-400 hover:text-white p-1">✕</button>
@@ -381,9 +381,10 @@
 
       <div class="space-y-3.5 text-xs">
         <div>
-          <label class="block font-bold text-slate-200 uppercase tracking-wider mb-1">跑友暱稱 (隊友名稱)</label>
+          <label class="block font-bold text-slate-200 uppercase tracking-wider mb-1">跑友暱稱 (我的專屬名字)</label>
           <input id="input-custom-nickname" type="text" maxlength="20" placeholder="例如：飛毛腿小華、阿豪"
                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#18263E] border border-slate-700 text-white focus:outline-none focus:border-teal-400 text-sm font-semibold">
+          <p class="text-[10px] text-slate-400 mt-1">💡 暱稱儲存後會保留在您的手機中，下次開啟網頁將直接套用。</p>
         </div>
 
         <div>
@@ -414,8 +415,9 @@
         </div>
       </div>
 
-      <button id="btn-save-nickname" type="button" class="w-full py-3 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-black text-xs sm:text-sm shadow-xl transition active:scale-95">
-        確認儲存暱稱
+      <button id="btn-save-nickname" type="button" class="w-full py-3 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-black text-xs sm:text-sm shadow-xl transition active:scale-95 flex items-center justify-center gap-1.5">
+        <span>💾</span>
+        <span>儲存暱稱 (下次直接套用)</span>
       </button>
     </div>
   </div>
@@ -545,6 +547,7 @@
             <label class="block font-bold text-slate-200 mb-1">跑友暱稱：</label>
             <input id="settings-runner-name" type="text" maxlength="20" placeholder="例如：飛毛腿阿豪"
                    class="w-full px-3 py-2 rounded-xl bg-[#131E32] border border-slate-700 text-white focus:outline-none focus:border-teal-400 text-xs sm:text-sm font-semibold">
+            <p class="text-[10px] text-teal-400 mt-1">💡 暱稱儲存後會永久保存在本機，下次開啟或加入新小隊直接套用。</p>
           </div>
 
           <div>
@@ -576,7 +579,7 @@
 
           <button id="btn-settings-save-profile" type="button" class="w-full py-2.5 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-black text-xs shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5">
             <span>💾</span>
-            <span>儲存個人暱稱與頭像</span>
+            <span>儲存個人名片 (下次直接套用此暱稱)</span>
           </button>
         </div>
       </div>
@@ -679,6 +682,6 @@
   <div id="toast-container" class="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none px-4 w-full max-w-sm"></div>
 
   <!-- 載入核心模組 (含快取破除參數) -->
-  <script type="module" src="js/app.js?v=20261113_8"></script>
+  <script type="module" src="js/app.js?v=20261113_9"></script>
 </body>
 </html>
