@@ -373,6 +373,13 @@ class App {
       el.btnClearAppCache.addEventListener('click', () => this.clearAppCacheAndCookies());
     }
 
+    // 設定彈窗內的關屏背景定位開關 (綠色開啟 / 紅色關閉)
+    if (el.btnSettingsToggleWakelock) {
+      el.btnSettingsToggleWakelock.addEventListener('click', () => {
+        uiController.toggleWakeLock();
+      });
+    }
+
     // 點擊主畫面小隊名稱或頂部標籤，直接開啟設定彈窗並聚焦
     const dashTitleBtn = document.getElementById('dash-team-title-btn');
     if (dashTitleBtn) {
@@ -460,6 +467,7 @@ class App {
       uiController.showToast('正在退出小隊...', 'info');
       geolocationService.stopTracking();
       backgroundTrackingService.stop();
+      uiController.updateWakelockSwitchUI(false);
       try {
         await firebaseService.leaveRoom();
       } catch (e) {
@@ -976,6 +984,7 @@ class App {
     backgroundTrackingService.start((pos) => {
       geolocationService.ingestPosition(pos);
     });
+    uiController.updateWakelockSwitchUI(true);
 
     geolocationService.startTracking(
       this.config.geolocation,
@@ -1062,6 +1071,7 @@ class App {
     if (runnerId === this.selfRunner.id) {
       geolocationService.stopTracking();
       backgroundTrackingService.stop();
+      uiController.updateWakelockSwitchUI(false);
 
       // 隨機生成 3 個大寫英文字母加上 3 個數字代碼 (如 ABC-123)
       const newRandomRoom = generateRandomRoomCode();

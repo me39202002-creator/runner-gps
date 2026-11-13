@@ -35,6 +35,11 @@ class UIController {
       btnToggleWakelock: document.getElementById('btn-toggle-wakelock'),
       btnToggleWakelockMobile: document.getElementById('btn-toggle-wakelock-mobile'),
       wakelockBtnText: document.getElementById('wakelock-btn-text'),
+      wakelockSwitchTrack: document.getElementById('wakelock-switch-track'),
+      wakelockSwitchTrackMobile: document.getElementById('wakelock-switch-track-mobile'),
+      btnSettingsToggleWakelock: document.getElementById('btn-settings-toggle-wakelock'),
+      wakelockSwitchTrackSettings: document.getElementById('wakelock-switch-track-settings'),
+      settingsWakelockStatusText: document.getElementById('settings-wakelock-status-text'),
       btnPocketMode: document.getElementById('btn-pocket-mode'),
       btnPocketModeMobile: document.getElementById('btn-pocket-mode-mobile'),
 
@@ -573,18 +578,69 @@ class UIController {
   }
 
   /**
+   * 同步更新關屏背景定位之擬物開關 UI (啟動為綠色，關閉為紅色)
+   * 同步連動頂部桌機按鈕、手機導航列微型開關、以及設定彈窗開關
+   */
+  updateWakelockSwitchUI(isOn) {
+    const tracks = [
+      this.elements.wakelockSwitchTrack,
+      this.elements.wakelockSwitchTrackMobile,
+      this.elements.wakelockSwitchTrackSettings
+    ].filter(Boolean);
+
+    tracks.forEach((track) => {
+      if (isOn) {
+        track.classList.add('is-on');
+        track.classList.remove('is-off');
+      } else {
+        track.classList.add('is-off');
+        track.classList.remove('is-on');
+      }
+    });
+
+    // 桌機頂部開關按鈕邊框與樣式
+    if (this.elements.btnToggleWakelock) {
+      if (isOn) {
+        this.elements.btnToggleWakelock.className = 'px-2.5 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-semibold text-xs flex items-center gap-2 transition active:scale-95 shadow-sm';
+      } else {
+        this.elements.btnToggleWakelock.className = 'px-2.5 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 font-semibold text-xs flex items-center gap-2 transition active:scale-95 shadow-sm';
+      }
+    }
+
+    // 行動端微型開關按鈕邊框與樣式
+    if (this.elements.btnToggleWakelockMobile) {
+      if (isOn) {
+        this.elements.btnToggleWakelockMobile.className = 'p-1 px-1.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 flex items-center gap-1 transition active:scale-95 shadow-sm';
+      } else {
+        this.elements.btnToggleWakelockMobile.className = 'p-1 px-1.5 rounded-xl bg-rose-950/70 border border-rose-500/40 flex items-center gap-1 transition active:scale-95 shadow-sm';
+      }
+    }
+
+    // 狀態文字提示
+    if (this.elements.wakelockBtnText) {
+      this.elements.wakelockBtnText.textContent = isOn ? '關屏定位: 開啟' : '關屏定位: 關閉';
+    }
+
+    // 設定彈窗內文字標籤
+    if (this.elements.settingsWakelockStatusText) {
+      this.elements.settingsWakelockStatusText.textContent = isOn ? '已啟動 (綠色)' : '已關閉 (紅色)';
+      this.elements.settingsWakelockStatusText.className = isOn
+        ? 'text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30'
+        : 'text-[11px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30';
+    }
+  }
+
+  /**
    * 螢幕防休眠 (Screen Wake Lock API) 與背景鎖屏保活
    */
   async requestWakeLock() {
     if ('wakeLock' in navigator) {
       try {
         this.wakeLock = await navigator.wakeLock.request('screen');
-        if (this.elements.wakelockBtnText) {
-          this.elements.wakelockBtnText.textContent = '關屏持續定位中 (可按電源鍵)';
-        }
+        this.updateWakelockSwitchUI(true);
         this.wakeLock.addEventListener('release', () => {
-          if (this.elements.wakelockBtnText) {
-            this.elements.wakelockBtnText.textContent = '關屏定位已暫停 (點擊開啟)';
+          if (!backgroundTrackingService.isActive) {
+            this.updateWakelockSwitchUI(false);
           }
         });
       } catch (err) {
@@ -594,24 +650,21 @@ class UIController {
   }
 
   toggleWakeLock() {
-    if (this.wakeLock || backgroundTrackingService.isActive) {
+    const isCurrentlyActive = !!this.wakeLock || backgroundTrackingService.isActive;
+    if (isCurrentlyActive) {
       if (this.wakeLock) {
         this.wakeLock.release().then(() => {
           this.wakeLock = null;
-        });
+        }).catch(() => {});
       }
       backgroundTrackingService.stop();
-      if (this.elements.wakelockBtnText) {
-        this.elements.wakelockBtnText.textContent = '關屏定位已暫停 (點擊開啟)';
-      }
-      this.showToast('已暫停關屏背景定位', 'info');
+      this.updateWakelockSwitchUI(false);
+      this.showToast('🔴 關屏背景定位已關閉 (紅色)', 'info');
     } else {
       this.requestWakeLock();
       backgroundTrackingService.start();
-      if (this.elements.wakelockBtnText) {
-        this.elements.wakelockBtnText.textContent = '關屏持續定位中 (可按電源鍵)';
-      }
-      this.showToast('✅ 關屏追蹤保活已啟動！您可直接按手機電源鍵關閉螢幕，鎖定畫面將顯示追蹤狀態並持續回傳 GPS。', 'success');
+      this.updateWakelockSwitchUI(true);
+      this.showToast('🟢 關屏背景定位已啟動 (綠色)！可直接按電源鍵關閉螢幕', 'success');
     }
   }
 

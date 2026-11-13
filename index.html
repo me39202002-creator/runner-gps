@@ -41,7 +41,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <!-- 客製化樣式 -->
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20261113_8">
 </head>
 <body class="bg-[#0A0F1D] text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
 
@@ -88,9 +88,12 @@
           </svg>
         </button>
 
-        <!-- 熄屏追蹤 (圖示版) -->
-        <button id="btn-toggle-wakelock-mobile" type="button" class="p-1.5 rounded-xl bg-emerald-950 border border-emerald-600/50 text-emerald-400" title="常亮/熄屏追蹤">
-          <span class="text-xs">🌙</span>
+        <!-- 關屏背景定位開關 (行動端：綠色啟動 / 紅色關閉) -->
+        <button id="btn-toggle-wakelock-mobile" type="button" class="p-1 px-1.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 flex items-center gap-1 transition active:scale-95 shadow-sm" title="關屏背景定位開關 (綠色啟動 / 紅色關閉)">
+          <span class="text-[11px]">🌙</span>
+          <span id="wakelock-switch-track-mobile" class="runner-switch-track switch-sm is-on">
+            <span class="runner-switch-thumb"></span>
+          </span>
         </button>
 
         <!-- 口袋黑屏 (圖示版) -->
@@ -116,9 +119,15 @@
         <span>加入/邀請跑友</span>
       </button>
 
-      <button id="btn-toggle-wakelock" type="button" class="px-3 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-600/50 text-emerald-400 font-semibold text-xs flex items-center gap-1.5 transition active:scale-95" title="鎖屏與熄屏背景持續定位">
-        <span>🌙</span>
-        <span id="wakelock-btn-text">關屏持續定位中 (可按電源鍵)</span>
+      <!-- 關屏背景定位開關 (桌機版：綠色啟動 / 紅色關閉) -->
+      <button id="btn-toggle-wakelock" type="button" class="px-2.5 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-semibold text-xs flex items-center gap-2 transition active:scale-95 shadow-sm" title="關屏背景定位開關：啟動為綠色，關閉為紅色">
+        <span class="flex items-center gap-1">
+          <span>🌙</span>
+          <span id="wakelock-btn-text">關屏定位: 開啟</span>
+        </span>
+        <span id="wakelock-switch-track" class="runner-switch-track switch-md is-on">
+          <span class="runner-switch-thumb"></span>
+        </span>
       </button>
 
       <button id="btn-pocket-mode" type="button" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition active:scale-95" title="啟動口袋黑屏防誤觸">
@@ -572,7 +581,31 @@
         </div>
       </div>
 
-      <!-- 區塊三：系統快捷動作 (退出小隊) -->
+      <!-- 區塊三：關屏背景定位開關 (綠色開啟 / 紅色關閉) -->
+      <div class="bg-[#18263E] border border-slate-700/80 rounded-2xl p-3.5 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+            <span>🌙</span>
+            <span>關屏背景定位 (電源鍵鎖屏追蹤)</span>
+          </div>
+          <span id="settings-wakelock-status-text" class="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+            已啟動 (綠色)
+          </span>
+        </div>
+        <p class="text-[10px] text-slate-400 leading-relaxed">
+          綠色代表已啟動、紅色代表已關閉。啟動時按手機電源鍵鎖定螢幕，系統仍可在背景持續回傳 GPS 軌跡與配速。
+        </p>
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-xs text-slate-300 font-medium">點擊開關切換狀態：</span>
+          <button id="btn-settings-toggle-wakelock" type="button" class="p-1 rounded-xl focus:outline-none transition active:scale-95" title="切換關屏背景定位">
+            <span id="wakelock-switch-track-settings" class="runner-switch-track switch-lg is-on">
+              <span class="runner-switch-thumb"></span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 區塊四：系統快捷動作 (退出小隊) -->
       <div class="bg-[#18263E] border border-slate-700/80 rounded-2xl p-3.5 space-y-2">
         <div class="text-xs font-bold text-slate-300">🚪 退出目前小隊</div>
         <p class="text-[10px] text-slate-400">退出小隊後將停止即時廣播，需要重新輸入代碼才能再次進入。</p>
@@ -646,6 +679,6 @@
   <div id="toast-container" class="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none px-4 w-full max-w-sm"></div>
 
   <!-- 載入核心模組 (含快取破除參數) -->
-  <script type="module" src="js/app.js?v=20261113_7"></script>
+  <script type="module" src="js/app.js?v=20261113_8"></script>
 </body>
 </html>
