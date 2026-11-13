@@ -63,12 +63,13 @@
           <div class="flex items-center gap-1.5 flex-wrap">
             <h1 class="text-sm sm:text-base font-extrabold text-white tracking-wide">跑友即時地圖</h1>
             
-            <!-- 房間標籤 -->
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-700/50">
+            <!-- 房間與小隊名稱標籤 (點擊可直接修改小隊名稱與設定) -->
+            <button id="btn-header-room-pill" type="button" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-700/50 hover:bg-emerald-900/60 transition active:scale-95" title="點擊修改小隊名稱與設定">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span id="header-room-display">RUN-888</span>
+              <span id="header-room-display">跑友即時小隊 (RUN-888)</span>
               <span id="header-lock-icon" class="hidden text-amber-400 text-[10px]">🔒</span>
-            </span>
+              <span class="text-[10px] text-emerald-400/80 ml-0.5">✏️</span>
+            </button>
 
             <!-- 模式標籤 -->
             <span id="header-mode-tag" class="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-teal-400 border border-slate-700">
@@ -247,7 +248,10 @@
           </div>
           <div>
             <div class="flex items-center gap-1.5 flex-wrap">
-              <h2 id="dash-team-title" class="text-sm sm:text-base font-bold text-white">跑友即時小隊</h2>
+              <button id="dash-team-title-btn" type="button" class="text-sm sm:text-base font-bold text-white hover:text-teal-300 transition flex items-center gap-1.5 text-left active:scale-95" title="點擊直接修改小隊名稱">
+                <span id="dash-team-title">跑友即時小隊</span>
+                <span class="text-xs text-amber-400">✏️</span>
+              </button>
               <span id="captain-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950">你是隊長</span>
               <button id="btn-open-captain-settings" type="button" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition flex items-center gap-1" title="隊長設定小隊名稱與密碼">
                 <span>⚙️ 設定小隊</span>

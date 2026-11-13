@@ -26,7 +26,7 @@ class App {
   constructor() {
     this.config = getAppConfig();
     this.roomId = 'RUN-888';
-    this.roomName = '跑友即時小隊';
+    this.roomName = localStorage.getItem('runner_gps_room_name') || '跑友即時小隊';
     this.roomPassword = null;
     this.hasRoomPassword = false;
     this.selfRunner = null;
@@ -57,6 +57,11 @@ class App {
     // 檢查是否曾經主動退出小隊或被移出
     const hasJoinedStatus = localStorage.getItem('runner_gps_has_joined');
     const needExplicitJoin = hasJoinedStatus === 'false';
+
+    const savedRoomName = localStorage.getItem('runner_gps_room_name');
+    if (savedRoomName) {
+      this.roomName = savedRoomName;
+    }
 
     this.loadSavedProfile(!!safeUrlRoom && safeUrlRoom !== 'RUN-888');
 
@@ -278,6 +283,26 @@ class App {
       el.btnSaveCaptainSettings.addEventListener('click', () => this.handleSaveCaptainSettings());
     }
 
+    // 點擊主畫面小隊名稱或頂部標籤，直接開啟隊長設定彈窗修改小隊名稱
+    const openCaptainSettingsWithFocus = () => {
+      uiController.openCaptainSettingsModal(this.roomName, this.roomId, this.roomPassword);
+      setTimeout(() => {
+        if (uiController.elements.inputCaptainTeamName) {
+          uiController.elements.inputCaptainTeamName.focus();
+          uiController.elements.inputCaptainTeamName.select();
+        }
+      }, 100);
+    };
+
+    const dashTitleBtn = document.getElementById('dash-team-title-btn');
+    if (dashTitleBtn) {
+      dashTitleBtn.addEventListener('click', openCaptainSettingsWithFocus);
+    }
+    const headerRoomPill = document.getElementById('btn-header-room-pill');
+    if (headerRoomPill) {
+      headerRoomPill.addEventListener('click', openCaptainSettingsWithFocus);
+    }
+
     // 說明按鈕
     const btnHelp = document.getElementById('btn-help');
     if (btnHelp) {
@@ -469,6 +494,7 @@ class App {
     this.roomName = newName;
     this.roomPassword = newPwd;
     this.hasRoomPassword = !!newPwd;
+    localStorage.setItem('runner_gps_room_name', this.roomName);
 
     if (isCodeChanged) {
       // 若代碼變更，遷移至新房間
@@ -517,7 +543,12 @@ class App {
     }
 
     this.roomId = validatedRoom;
-    this.roomName = sanitizeRoomName(rawRoomName, '跑友即時小隊');
+    if (rawRoomName && rawRoomName.trim()) {
+      this.roomName = sanitizeRoomName(rawRoomName, '跑友即時小隊');
+      localStorage.setItem('runner_gps_room_name', this.roomName);
+    } else {
+      this.roomName = sanitizeRoomName(rawRoomName, this.roomName || '跑友即時小隊');
+    }
     this.roomPassword = sanitizeRoomPassword(rawRoomPwd);
     this.hasRoomPassword = !!this.roomPassword;
 
@@ -591,7 +622,13 @@ class App {
           return;
         }
 
-        this.roomName = joinRes.roomName || this.roomName;
+        if (joinRes.roomName && joinRes.roomName !== '跑友即時小隊') {
+          this.roomName = joinRes.roomName;
+          localStorage.setItem('runner_gps_room_name', this.roomName);
+        } else if (this.roomName && this.roomName !== '跑友即時小隊') {
+          // 若本機有自訂名稱，但 Firebase 還是預設名稱，立即同步至 Firebase
+          await firebaseService.updateRoomMetadata(this.roomId, this.roomName, this.roomPassword);
+        }
         this.hasRoomPassword = joinRes.hasPassword;
         uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
         uiController.showToast(`已成功加入小隊 [${this.roomName}]`, 'success');
@@ -675,6 +712,7 @@ class App {
       if (meta && meta.name) {
         this.roomName = meta.name;
         this.hasRoomPassword = !!meta.hasPassword;
+        localStorage.setItem('runner_gps_room_name', this.roomName);
         uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
       }
     });

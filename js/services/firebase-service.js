@@ -121,11 +121,21 @@ class FirebaseService {
         }
       }
 
+      // 若有傳入新的自訂名稱且不同於現存名稱，自動同步更新至 Firebase
+      if (roomName && roomName !== '跑友即時小隊' && roomName !== metadata.name) {
+        try {
+          await update(metaRef, { name: roomName, updatedAt: serverTimestamp() });
+          metadata.name = roomName;
+        } catch (e) {
+          console.warn('[FirebaseService] 更新房間名稱警告:', e);
+        }
+      }
+
       await this.joinRoom(roomId, runnerInfo);
       return {
         success: true,
         isNewRoom: false,
-        roomName: metadata.name,
+        roomName: metadata.name || roomName,
         hasPassword: metadata.hasPassword
       };
     }
