@@ -25,7 +25,7 @@ import { uiController } from './components/ui-controller.js';
 class App {
   constructor() {
     this.config = getAppConfig();
-    this.roomId = 'RUN-888';
+    this.roomId = localStorage.getItem('runner_gps_room_id') || 'RUN-888';
     this.roomName = localStorage.getItem('runner_gps_room_name') || '跑友即時小隊';
     this.roomPassword = null;
     this.hasRoomPassword = false;
@@ -47,7 +47,15 @@ class App {
     // 檢查 URL 房間參數與可能帶入之密碼
     const urlRoom = getSafeURLParam('room');
     const safeUrlRoom = validateAndSanitizeRoomId(urlRoom);
-    this.roomId = safeUrlRoom || 'RUN-888';
+    if (safeUrlRoom) {
+      this.roomId = safeUrlRoom;
+      localStorage.setItem('runner_gps_room_id', this.roomId);
+    } else {
+      const savedRoomId = localStorage.getItem('runner_gps_room_id');
+      if (savedRoomId && validateAndSanitizeRoomId(savedRoomId)) {
+        this.roomId = savedRoomId;
+      }
+    }
 
     const urlPwd = getSafeURLParam('pwd');
     if (urlPwd) {
@@ -262,11 +270,34 @@ class App {
       });
     }
 
-    // 隊長專屬小隊管理彈窗
+    // 系統與小隊綜合設定彈窗
+    const openSettingsModal = (focusField = null) => {
+      uiController.openCaptainSettingsModal(this.roomName, this.roomId, this.roomPassword, this.selfRunner);
+      if (focusField === 'teamName') {
+        setTimeout(() => {
+          if (el.inputCaptainTeamName) {
+            el.inputCaptainTeamName.focus();
+            el.inputCaptainTeamName.select();
+          }
+        }, 100);
+      } else if (focusField === 'teamCode') {
+        setTimeout(() => {
+          if (el.inputCaptainTeamCode) {
+            el.inputCaptainTeamCode.focus();
+            el.inputCaptainTeamCode.select();
+          }
+        }, 100);
+      }
+    };
+
     if (el.btnOpenCaptainSettings) {
-      el.btnOpenCaptainSettings.addEventListener('click', () => {
-        uiController.openCaptainSettingsModal(this.roomName, this.roomId, this.roomPassword);
-      });
+      el.btnOpenCaptainSettings.addEventListener('click', () => openSettingsModal());
+    }
+    if (el.btnTopSettings) {
+      el.btnTopSettings.addEventListener('click', () => openSettingsModal());
+    }
+    if (el.btnTopSettingsMobile) {
+      el.btnTopSettingsMobile.addEventListener('click', () => openSettingsModal());
     }
     if (el.btnCloseCaptainSettings) {
       el.btnCloseCaptainSettings.addEventListener('click', () => {
@@ -276,31 +307,57 @@ class App {
     if (el.btnCaptainClearPwd) {
       el.btnCaptainClearPwd.addEventListener('click', () => {
         if (el.inputCaptainTeamPwd) el.inputCaptainTeamPwd.value = '';
-        uiController.showToast('已清空密碼，儲存後將成為公開小隊', 'info');
+        uiController.showToast('已清空密碼，儲存後將成為公開免密碼小隊', 'info');
       });
     }
     if (el.btnSaveCaptainSettings) {
       el.btnSaveCaptainSettings.addEventListener('click', () => this.handleSaveCaptainSettings());
     }
 
-    // 點擊主畫面小隊名稱或頂部標籤，直接開啟隊長設定彈窗修改小隊名稱
-    const openCaptainSettingsWithFocus = () => {
-      uiController.openCaptainSettingsModal(this.roomName, this.roomId, this.roomPassword);
-      setTimeout(() => {
-        if (uiController.elements.inputCaptainTeamName) {
-          uiController.elements.inputCaptainTeamName.focus();
-          uiController.elements.inputCaptainTeamName.select();
-        }
-      }, 100);
-    };
+    // 設定彈窗內的個人暱稱與頭像儲存
+    if (el.btnSettingsSaveProfile) {
+      el.btnSettingsSaveProfile.addEventListener('click', () => this.handleSaveSettingsRunnerProfile());
+    }
 
+    // 設定彈窗內的頭像與代表色點擊
+    if (el.settingsAvatarSelector) {
+      el.settingsAvatarSelector.addEventListener('click', (e) => {
+        const btn = e.target.closest('.avatar-opt');
+        if (!btn) return;
+        el.settingsAvatarSelector.querySelectorAll('.avatar-opt').forEach((b) => {
+          b.classList.remove('border-teal-400', 'bg-teal-400/10');
+          b.classList.add('border-transparent');
+        });
+        btn.classList.add('border-teal-400', 'bg-teal-400/10');
+        btn.classList.remove('border-transparent');
+        this.selfRunner.avatar = btn.dataset.avatar || '🏃‍♂️';
+      });
+    }
+    if (el.settingsColorSelector) {
+      el.settingsColorSelector.addEventListener('click', (e) => {
+        const btn = e.target.closest('.color-opt');
+        if (!btn) return;
+        el.settingsColorSelector.querySelectorAll('.color-opt').forEach((b) => {
+          b.classList.remove('ring-4', 'ring-teal-400/30');
+        });
+        btn.classList.add('ring-4', 'ring-teal-400/30');
+        this.selfRunner.color = btn.dataset.color || '#05D5A4';
+      });
+    }
+
+    // 清除快取檔案與 Cookie (用戶強烈要求)
+    if (el.btnClearAppCache) {
+      el.btnClearAppCache.addEventListener('click', () => this.clearAppCacheAndCookies());
+    }
+
+    // 點擊主畫面小隊名稱或頂部標籤，直接開啟設定彈窗並聚焦
     const dashTitleBtn = document.getElementById('dash-team-title-btn');
     if (dashTitleBtn) {
-      dashTitleBtn.addEventListener('click', openCaptainSettingsWithFocus);
+      dashTitleBtn.addEventListener('click', () => openSettingsModal('teamName'));
     }
     const headerRoomPill = document.getElementById('btn-header-room-pill');
     if (headerRoomPill) {
-      headerRoomPill.addEventListener('click', openCaptainSettingsWithFocus);
+      headerRoomPill.addEventListener('click', () => openSettingsModal('teamName'));
     }
 
     // 說明按鈕
@@ -414,6 +471,12 @@ class App {
     if (el.btnLeaveTeam) {
       el.btnLeaveTeam.addEventListener('click', handleLeaveTeamAction);
     }
+    if (el.btnSettingsLeaveTeam) {
+      el.btnSettingsLeaveTeam.addEventListener('click', () => {
+        uiController.closeCaptainSettingsModal();
+        handleLeaveTeamAction();
+      });
+    }
 
     // 設定 Modal
     if (el.btnToggleSettings) {
@@ -495,17 +558,28 @@ class App {
     this.roomPassword = newPwd;
     this.hasRoomPassword = !!newPwd;
     localStorage.setItem('runner_gps_room_name', this.roomName);
+    localStorage.setItem('runner_gps_room_id', newCode);
 
     if (isCodeChanged) {
       // 若代碼變更，遷移至新房間
+      uiController.showToast(`正在切換至新小隊房間 [${newCode}]...`, 'info');
       await firebaseService.leaveRoom();
+
+      // 清除舊房間的隊友（地圖 Marker + 排行榜清單），只保留自己
+      mapRenderer.clearAllRunners(true);
+      uiController.clearRunners(true);
+
       this.roomId = newCode;
-      await firebaseService.verifyAndJoinRoom(
+      const joinRes = await firebaseService.verifyAndJoinRoom(
         this.roomId,
         this.roomName,
         this.roomPassword,
         this.selfRunner
       );
+      if (joinRes.roomName && joinRes.roomName !== '跑友即時小隊') {
+        this.roomName = joinRes.roomName;
+        localStorage.setItem('runner_gps_room_name', this.roomName);
+      }
       this.subscribeRoomRunners();
     } else {
       // 僅更新目前房間設定
@@ -523,8 +597,108 @@ class App {
     window.history.replaceState({}, '', newUrl.toString());
 
     uiController.renderRoomDetails(this.roomId, this.roomName, this.hasRoomPassword);
+    uiController.refreshDashboard(
+      (id, r) => this.handleFocusRunner(id, r),
+      (id, r) => this.handleKickRunner(id, r),
+      this.selfRunner.isCaptain
+    );
     uiController.closeCaptainSettingsModal();
-    uiController.showToast('👑 隊長權限：小隊設定已成功更新！', 'success');
+    uiController.showToast(`✅ 小隊設定已更新生效！[${this.roomName} · ${this.roomId}]`, 'success');
+  }
+
+  /**
+   * 在綜合設定彈窗中儲存個人暱稱、頭像與代表色
+   */
+  async handleSaveSettingsRunnerProfile() {
+    const el = uiController.elements;
+    const rawName = el.settingsRunnerName ? el.settingsRunnerName.value : '';
+    const newName = sanitizeRunnerName(rawName, this.selfRunner.name || '熱血跑友');
+
+    this.selfRunner.name = newName;
+    this.saveProfile();
+    uiController.updateSelfStrip(this.selfRunner);
+
+    if (this.latestSelfCoords) {
+      const updatedData = {
+        ...this.selfRunner,
+        lat: this.latestSelfCoords.lat,
+        lng: this.latestSelfCoords.lng,
+        speed: this.latestSelfCoords.speed,
+        heading: this.latestSelfCoords.heading,
+        totalDistanceMeters: this.latestSelfCoords.totalDistanceMeters || 0,
+        isOnline: true,
+        updatedAt: Date.now()
+      };
+      mapRenderer.updateRunner(this.selfRunner.id, updatedData, true);
+      uiController.upsertRunner(
+        this.selfRunner.id,
+        updatedData,
+        (id, r) => this.handleFocusRunner(id, r),
+        (id, r) => this.handleKickRunner(id, r),
+        this.selfRunner.isCaptain
+      );
+    }
+
+    try {
+      await firebaseService.joinRoom(this.roomId, this.selfRunner);
+      uiController.showToast(`✅ 個人暱稱已更新為「${this.selfRunner.name}」！`, 'success');
+    } catch (e) {
+      console.warn('[App] 更新個人資料至雲端警告:', e);
+    }
+  }
+
+  /**
+   * 清除應用程式所有快取檔案、Cookie 與本地暫存並重整
+   */
+  async clearAppCacheAndCookies() {
+    const confirmed = confirm(
+      '⚠️ 清除快取確認：\n\n這將會清除本程式在瀏覽器中的所有快取檔案、Cookie、房間小隊紀錄與個人暫存，並重新載入最新版本。\n\n確定要立即清除並重整嗎？'
+    );
+    if (!confirmed) return;
+
+    uiController.showToast('🧹 正在清除快取與 Cookie...', 'info');
+
+    try {
+      // 1. 清除 LocalStorage
+      localStorage.clear();
+
+      // 2. 清除 SessionStorage
+      sessionStorage.clear();
+
+      // 3. 清除所有 Cookies
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i];
+        const eqPos = cookie.indexOf('=');
+        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+        if (name) {
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`;
+        }
+      }
+
+      // 4. 清除 CacheStorage API
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        const cacheKeys = await window.caches.keys();
+        await Promise.all(cacheKeys.map(key => window.caches.delete(key)));
+      }
+
+      // 5. 註銷 Service Workers
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.unregister();
+        }
+      }
+    } catch (err) {
+      console.warn('[App] 清除快取部分過程警告:', err);
+    }
+
+    // 6. 強制無快取重新載入網頁
+    setTimeout(() => {
+      const cleanUrl = window.location.origin + window.location.pathname + '?nocache=' + Date.now();
+      window.location.replace(cleanUrl);
+    }, 400);
   }
 
   async handleConfirmJoin() {
@@ -543,6 +717,7 @@ class App {
     }
 
     this.roomId = validatedRoom;
+    localStorage.setItem('runner_gps_room_id', this.roomId);
     if (rawRoomName && rawRoomName.trim()) {
       this.roomName = sanitizeRoomName(rawRoomName, '跑友即時小隊');
       localStorage.setItem('runner_gps_room_name', this.roomName);

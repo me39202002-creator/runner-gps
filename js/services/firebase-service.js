@@ -28,6 +28,7 @@ class FirebaseService {
     this.currentRoomId = null;
     this.currentRunnerId = null;
     this.runnersRef = null;
+    this.metaRef = null;
     this.connectedRef = null;
     this.isInitialized = false;
     this.isConnected = false;
@@ -162,9 +163,13 @@ class FirebaseService {
    * 監聽小隊設定變更 (讓隊友畫面即時同步隊長修改的名稱與密碼狀態)
    */
   subscribeToRoomMetadata(roomId, onMetadataUpdated) {
-    if (!this.db) return;
-    const metaRef = ref(this.db, `rooms/${roomId}/metadata`);
-    onValue(metaRef, (snapshot) => {
+    if (!this.db || !roomId) return;
+    if (this.metaRef) {
+      try { off(this.metaRef); } catch (e) {}
+      this.metaRef = null;
+    }
+    this.metaRef = ref(this.db, `rooms/${roomId}/metadata`);
+    onValue(this.metaRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         if (typeof onMetadataUpdated === 'function') {
@@ -330,8 +335,12 @@ class FirebaseService {
    */
   unsubscribe() {
     if (this.runnersRef) {
-      off(this.runnersRef);
+      try { off(this.runnersRef); } catch (e) {}
       this.runnersRef = null;
+    }
+    if (this.metaRef) {
+      try { off(this.metaRef); } catch (e) {}
+      this.metaRef = null;
     }
     this.onRunnerUpdatedCallback = null;
     this.onRunnerRemovedCallback = null;

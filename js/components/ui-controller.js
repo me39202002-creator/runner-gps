@@ -99,7 +99,7 @@ class UIController {
       btnConfirmVerifyPwd: document.getElementById('btn-confirm-verify-pwd'),
       btnCancelVerifyPwd: document.getElementById('btn-cancel-verify-pwd'),
 
-      // 隊長專屬設定彈窗
+      // 隊長專屬設定彈窗 (綜合設定彈窗)
       captainSettingsModal: document.getElementById('captain-settings-modal'),
       btnCloseCaptainSettings: document.getElementById('btn-close-captain-settings'),
       inputCaptainTeamName: document.getElementById('input-captain-team-name'),
@@ -107,6 +107,14 @@ class UIController {
       inputCaptainTeamPwd: document.getElementById('input-captain-team-pwd'),
       btnCaptainClearPwd: document.getElementById('btn-captain-clear-pwd'),
       btnSaveCaptainSettings: document.getElementById('btn-save-captain-settings'),
+      btnTopSettings: document.getElementById('btn-top-settings'),
+      btnTopSettingsMobile: document.getElementById('btn-top-settings-mobile'),
+      btnClearAppCache: document.getElementById('btn-clear-app-cache'),
+      btnSettingsSaveProfile: document.getElementById('btn-settings-save-profile'),
+      btnSettingsLeaveTeam: document.getElementById('btn-settings-leave-team'),
+      settingsRunnerName: document.getElementById('settings-runner-name'),
+      settingsAvatarSelector: document.getElementById('settings-avatar-selector'),
+      settingsColorSelector: document.getElementById('settings-color-selector'),
 
       // 口袋黑屏
       pocketBlackScreen: document.getElementById('pocket-black-screen'),
@@ -243,6 +251,20 @@ class UIController {
   removeRunner(runnerId, onFocusRunner, onKickRunner = null, isCaptain = false) {
     this.cachedRunners.delete(runnerId);
     this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain);
+  }
+
+  /**
+   * 清除跑友清單快取 (例如切換小隊房間時)
+   * @param {boolean} keepSelf 是否保留自身
+   */
+  clearRunners(keepSelf = false) {
+    if (keepSelf && this.selfRunnerId && this.cachedRunners.has(this.selfRunnerId)) {
+      const selfData = this.cachedRunners.get(this.selfRunnerId);
+      this.cachedRunners.clear();
+      this.cachedRunners.set(this.selfRunnerId, selfData);
+    } else {
+      this.cachedRunners.clear();
+    }
   }
 
   /**
@@ -609,9 +631,9 @@ class UIController {
   }
 
   /**
-   * 隊長專屬小隊設定彈窗開關
+   * 隊長專屬小隊設定彈窗開關 (綜合設定彈窗)
    */
-  openCaptainSettingsModal(roomName, roomCode, roomPwd) {
+  openCaptainSettingsModal(roomName, roomCode, roomPwd, runnerProfile = null) {
     if (!this.elements.captainSettingsModal) return;
     this.elements.captainSettingsModal.classList.remove('hidden');
     if (this.elements.inputCaptainTeamName) {
@@ -622,6 +644,33 @@ class UIController {
     }
     if (this.elements.inputCaptainTeamPwd) {
       this.elements.inputCaptainTeamPwd.value = roomPwd || '';
+    }
+
+    // 填充個人資料設定
+    if (runnerProfile) {
+      if (this.elements.settingsRunnerName) {
+        this.elements.settingsRunnerName.value = runnerProfile.name || '';
+      }
+      if (this.elements.settingsAvatarSelector && runnerProfile.avatar) {
+        this.elements.settingsAvatarSelector.querySelectorAll('.avatar-opt').forEach((b) => {
+          if (b.dataset.avatar === runnerProfile.avatar) {
+            b.classList.remove('border-transparent');
+            b.classList.add('border-teal-400', 'bg-teal-400/10');
+          } else {
+            b.classList.remove('border-teal-400', 'bg-teal-400/10');
+            b.classList.add('border-transparent');
+          }
+        });
+      }
+      if (this.elements.settingsColorSelector && runnerProfile.color) {
+        this.elements.settingsColorSelector.querySelectorAll('.color-opt').forEach((b) => {
+          if (b.dataset.color && b.dataset.color.toLowerCase() === runnerProfile.color.toLowerCase()) {
+            b.classList.add('ring-4', 'ring-teal-400/30');
+          } else {
+            b.classList.remove('ring-4', 'ring-teal-400/30');
+          }
+        });
+      }
     }
   }
 

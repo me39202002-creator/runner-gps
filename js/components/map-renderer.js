@@ -292,6 +292,21 @@ class MapRenderer {
     }
   }
 
+  /**
+   * 清除所有跑友標記 (例如切換小隊房間時)
+   * @param {boolean} keepSelf 是否保留自身標記
+   */
+  clearAllRunners(keepSelf = false) {
+    this.runners.forEach((runnerObj, id) => {
+      if (keepSelf && id === this.selfRunnerId) return;
+      if (runnerObj.marker) runnerObj.marker.setMap(null);
+      if (runnerObj.polyline) runnerObj.polyline.setMap(null);
+      if (runnerObj.accuracyCircle) runnerObj.accuracyCircle.setMap(null);
+      if (runnerObj.infoWindow) runnerObj.infoWindow.close();
+      this.runners.delete(id);
+    });
+  }
+
   panTo(lat, lng, zoom = null) {
     if (!this.map) return;
     this.map.panTo(new google.maps.LatLng(lat, lng));
