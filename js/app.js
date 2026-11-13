@@ -20,6 +20,7 @@ import {
 } from './security.js';
 import { firebaseService } from './services/firebase-service.js';
 import { geolocationService } from './services/geolocation-service.js';
+import { backgroundTrackingService } from './services/background-tracking-service.js';
 import { mapRenderer } from './components/map-renderer.js';
 import { uiController } from './components/ui-controller.js';
 
@@ -458,6 +459,7 @@ class App {
 
       uiController.showToast('正在退出小隊...', 'info');
       geolocationService.stopTracking();
+      backgroundTrackingService.stop();
       try {
         await firebaseService.leaveRoom();
       } catch (e) {
@@ -969,6 +971,12 @@ class App {
 
   startTracking() {
     this.isTracking = true;
+
+    // 啟動關屏背景保活與 GPS 脈衝 (支援手機螢幕物理關閉後持續在背景定位)
+    backgroundTrackingService.start((pos) => {
+      geolocationService.ingestPosition(pos);
+    });
+
     geolocationService.startTracking(
       this.config.geolocation,
       (coordsData) => {
@@ -1053,6 +1061,7 @@ class App {
     // 若自己被隊長移出小隊
     if (runnerId === this.selfRunner.id) {
       geolocationService.stopTracking();
+      backgroundTrackingService.stop();
 
       // 隨機生成 3 個大寫英文字母加上 3 個數字代碼 (如 ABC-123)
       const newRandomRoom = generateRandomRoomCode();

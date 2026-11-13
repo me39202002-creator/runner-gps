@@ -7,6 +7,7 @@
 
 import { createSafeElement, escapeHTML } from '../security.js';
 import { formatPace } from '../services/geolocation-service.js';
+import { backgroundTrackingService } from '../services/background-tracking-service.js';
 
 class UIController {
   constructor() {
@@ -551,36 +552,39 @@ class UIController {
 
   /**
    * 口袋黑屏模式切換 (防誤觸與螢幕極致省電)
+   * 藉由 OLED/AMOLED 全黑像素關閉電源原理，達成 0% 螢幕耗電且不中斷連線
    */
   togglePocketMode(enable = null) {
     const el = this.elements.pocketBlackScreen;
     if (!el) return;
 
-    const isActive = el.classList.contains('active');
+    const isActive = el.classList.contains('active') && !el.classList.contains('hidden');
     const targetState = enable !== null ? enable : !isActive;
 
     if (targetState) {
+      el.classList.remove('hidden');
       el.classList.add('active');
-      this.showToast('已進入口袋防誤觸黑屏模式', 'info');
+      this.showToast('🌙 已進入極致省電黑屏 (連點兩下螢幕任意處即可喚醒)', 'info');
     } else {
       el.classList.remove('active');
-      this.showToast('已解除口袋黑屏', 'info');
+      el.classList.add('hidden');
+      this.showToast('☀️ 已解除口袋黑屏', 'info');
     }
   }
 
   /**
-   * 螢幕防休眠 (Screen Wake Lock API)
+   * 螢幕防休眠 (Screen Wake Lock API) 與背景鎖屏保活
    */
   async requestWakeLock() {
     if ('wakeLock' in navigator) {
       try {
         this.wakeLock = await navigator.wakeLock.request('screen');
         if (this.elements.wakelockBtnText) {
-          this.elements.wakelockBtnText.textContent = '熄屏追蹤中 (點擊關閉)';
+          this.elements.wakelockBtnText.textContent = '關屏持續定位中 (可按電源鍵)';
         }
         this.wakeLock.addEventListener('release', () => {
           if (this.elements.wakelockBtnText) {
-            this.elements.wakelockBtnText.textContent = '螢幕常亮已釋放 (點擊啟用)';
+            this.elements.wakelockBtnText.textContent = '關屏定位已暫停 (點擊開啟)';
           }
         });
       } catch (err) {
@@ -590,15 +594,24 @@ class UIController {
   }
 
   toggleWakeLock() {
-    if (this.wakeLock) {
-      this.wakeLock.release().then(() => {
-        this.wakeLock = null;
-        this.showToast('已關閉螢幕防休眠', 'info');
-      });
+    if (this.wakeLock || backgroundTrackingService.isActive) {
+      if (this.wakeLock) {
+        this.wakeLock.release().then(() => {
+          this.wakeLock = null;
+        });
+      }
+      backgroundTrackingService.stop();
+      if (this.elements.wakelockBtnText) {
+        this.elements.wakelockBtnText.textContent = '關屏定位已暫停 (點擊開啟)';
+      }
+      this.showToast('已暫停關屏背景定位', 'info');
     } else {
-      this.requestWakeLock().then(() => {
-        this.showToast('已啟用螢幕常亮防休眠', 'success');
-      });
+      this.requestWakeLock();
+      backgroundTrackingService.start();
+      if (this.elements.wakelockBtnText) {
+        this.elements.wakelockBtnText.textContent = '關屏持續定位中 (可按電源鍵)';
+      }
+      this.showToast('✅ 關屏追蹤保活已啟動！您可直接按手機電源鍵關閉螢幕，鎖定畫面將顯示追蹤狀態並持續回傳 GPS。', 'success');
     }
   }
 

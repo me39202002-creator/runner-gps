@@ -172,6 +172,15 @@ class GeolocationService {
   }
 
   /**
+   * 接收外部/背景 GPS 脈衝資料並統一進行精度過濾、距離累計與狀態分發
+   * 用於手機螢幕關閉時由背景保活服務定時傳入之 GPS 座標
+   */
+  ingestPosition(position, minDistance = 3, throttleMs = 2000, maxAccuracy = 50) {
+    if (!position || !position.coords) return;
+    this.handlePositionUpdate(position, minDistance, throttleMs, maxAccuracy);
+  }
+
+  /**
    * 停止 GPS 追蹤
    */
   stopTracking() {
