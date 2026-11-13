@@ -4,6 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>跑友即時地圖 | Runner GPS Live Tracker</title>
+
+  <!-- PWA Manifest & App Metadata -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0E172B">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="跑友GPS">
+  
+  <!-- Apple iOS PWA Support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="跑友GPS">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+
+  <!-- Favicon Icons -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="shortcut icon" href="icons/favicon.png">
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -41,7 +59,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <!-- 客製化樣式 -->
-  <link rel="stylesheet" href="css/style.css?v=20261113_9">
+  <link rel="stylesheet" href="css/style.css?v=20261113_11">
 </head>
 <body class="bg-[#0A0F1D] text-slate-100 min-h-screen flex flex-col font-sans select-none antialiased">
 
@@ -103,6 +121,13 @@
           </svg>
         </button>
 
+        <!-- PWA 安裝按鈕 (行動端圖示版) -->
+        <button id="btn-pwa-install-mobile" type="button" class="p-1.5 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-300 font-bold text-xs" title="安裝為手機獨立 App (PWA)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+        </button>
+
         <!-- 設定按鈕 (行動端圖示版) -->
         <button id="btn-top-settings-mobile" type="button" class="p-1.5 rounded-xl bg-slate-800 border border-slate-700 text-teal-300 font-bold text-xs" title="小隊與系統設定">
           <span>⚙️</span>
@@ -135,6 +160,14 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
         </svg>
         <span>口袋黑屏</span>
+      </button>
+
+      <!-- PWA 安裝按鈕 (桌機/Android/iOS) -->
+      <button id="btn-pwa-install" type="button" class="px-3 py-1.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/40 text-teal-300 font-semibold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-sm" title="安裝為手機/電腦桌面獨立 App">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        <span>安裝 App</span>
       </button>
 
       <!-- 系統與小隊設定按鈕 (桌機版) -->
@@ -608,7 +641,29 @@
         </div>
       </div>
 
-      <!-- 區塊四：系統快捷動作 (退出小隊) -->
+      <!-- 區塊四：PWA 獨立 App 安裝 (全螢幕原生體驗) -->
+      <div class="bg-[#18263E] border border-teal-500/40 rounded-2xl p-3.5 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-teal-400">
+            <span>📱</span>
+            <span>安裝為手機獨立 App (PWA)</span>
+          </div>
+          <span class="text-[10px] text-teal-300 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/30">
+            推薦安裝
+          </span>
+        </div>
+        <p class="text-[10px] text-slate-400 leading-relaxed">
+          安裝為 PWA 後可享受無網址列的原生全螢幕沉浸感，大幅提升手機系統給予的 GPS 背景常駐權限與連線穩定度。
+        </p>
+        <button id="btn-settings-install-pwa" type="button" class="w-full py-2.5 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-bold text-xs shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          <span>立即安裝至手機主畫面</span>
+        </button>
+      </div>
+
+      <!-- 區塊五：系統快捷動作 (退出小隊) -->
       <div class="bg-[#18263E] border border-slate-700/80 rounded-2xl p-3.5 space-y-2">
         <div class="text-xs font-bold text-slate-300">🚪 退出目前小隊</div>
         <p class="text-[10px] text-slate-400">退出小隊後將停止即時廣播，需要重新輸入代碼才能再次進入。</p>
@@ -681,7 +736,55 @@
   <!-- ========================================================================= -->
   <div id="toast-container" class="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none px-4 w-full max-w-sm"></div>
 
+  <!-- ========================================================================= -->
+  <!-- 11. 📱 PWA 安裝導引彈窗 (iOS / Android / Desktop) -->
+  <!-- ========================================================================= -->
+  <div id="pwa-guide-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#131E32] border border-teal-500/40 rounded-3xl max-w-sm w-full p-6 space-y-4 text-center shadow-2xl animate-in fade-in duration-150">
+      <div class="w-16 h-16 rounded-2xl bg-teal-400/20 border border-teal-400/40 mx-auto flex items-center justify-center text-3xl shadow-lg">
+        🏃‍♂️
+      </div>
+
+      <div>
+        <h3 class="text-base sm:text-lg font-extrabold text-white">安裝為手機獨立 App</h3>
+        <p class="text-xs text-slate-400 mt-1">免去網址列干擾，享受原生全螢幕與極致 GPS 穩定度！</p>
+      </div>
+
+      <!-- iOS 指引 -->
+      <div id="pwa-ios-instructions" class="bg-[#18263E] border border-slate-700/80 rounded-2xl p-3.5 text-left text-xs space-y-2 text-slate-200">
+        <div class="font-bold text-teal-400 flex items-center gap-1.5">
+          <span>🍎</span> iPhone (Safari) 兩步安裝法：
+        </div>
+        <ol class="list-decimal list-inside space-y-1.5 text-[11px] text-slate-300 leading-relaxed">
+          <li>點擊 Safari 底部工具列的 <strong class="text-white bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">「分享按鈕」</strong>（方形向上箭頭）</li>
+          <li>往下滑動選單，點選 <strong class="text-white bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">「加入主畫面 ➕」</strong></li>
+          <li>點擊右上角「新增」，手機桌面即出現專屬 App！</li>
+        </ol>
+      </div>
+
+      <!-- Android / Chrome 指引 -->
+      <div id="pwa-android-instructions" class="bg-[#18263E] border border-slate-700/80 rounded-2xl p-3.5 text-left text-xs space-y-2 text-slate-200 hidden">
+        <div class="font-bold text-emerald-400 flex items-center gap-1.5">
+          <span>🤖</span> Android (Chrome) 安裝：
+        </div>
+        <p class="text-[11px] text-slate-300 leading-relaxed">
+          點擊下方「立即安裝」按鈕，系統將自動將跑友即時地圖新增至您的應用程式清單與手機主畫面。
+        </p>
+      </div>
+
+      <div class="space-y-2 pt-1">
+        <button id="btn-pwa-confirm-install" type="button" class="w-full py-2.5 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-bold text-xs shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5">
+          <span>📲</span>
+          <span>我知道了 / 立即安裝</span>
+        </button>
+        <button id="btn-close-pwa-guide" type="button" class="w-full py-2 rounded-xl border border-slate-700 text-slate-400 text-xs hover:bg-slate-800 transition">
+          稍後再說
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- 載入核心模組 (含快取破除參數) -->
-  <script type="module" src="js/app.js?v=20261113_10"></script>
+  <script type="module" src="js/app.js?v=20261113_11"></script>
 </body>
 </html>

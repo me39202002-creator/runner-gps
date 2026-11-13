@@ -40,12 +40,14 @@ class App {
     this.isVirtualMode = false;
     this.heartbeatTimer = null;
     this.offlineSweepTimer = null;
+    this.deferredPrompt = null;
   }
 
   async init() {
     console.log('[App] 正在啟動跑友即時地圖...');
     uiController.init();
     this.bindEvents();
+    this.initServiceWorkerAndPWA();
 
     // 檢查 URL 房間參數與可能帶入之密碼
     const urlRoom = getSafeURLParam('room');
@@ -249,6 +251,27 @@ class App {
     }
     if (el.btnPocketModeMobile) {
       el.btnPocketModeMobile.addEventListener('click', () => uiController.togglePocketMode(true));
+    }
+
+    // PWA 安裝按鈕事件 (桌機、手機快捷、小隊設定)
+    const handlePwaAction = () => this.triggerPwaInstall();
+    if (el.btnPwaInstall) el.btnPwaInstall.addEventListener('click', handlePwaAction);
+    if (el.btnPwaInstallMobile) el.btnPwaInstallMobile.addEventListener('click', handlePwaAction);
+    if (el.btnSettingsInstallPwa) el.btnSettingsInstallPwa.addEventListener('click', handlePwaAction);
+
+    if (el.btnPwaConfirmInstall) {
+      el.btnPwaConfirmInstall.addEventListener('click', () => {
+        if (this.deferredPrompt) {
+          this.deferredPrompt.prompt();
+          this.deferredPrompt.userChoice.then(() => {
+            this.deferredPrompt = null;
+          });
+        }
+        uiController.closePwaGuideModal();
+      });
+    }
+    if (el.btnClosePwaGuide) {
+      el.btnClosePwaGuide.addEventListener('click', () => uiController.closePwaGuideModal());
     }
 
     // 邀請彈窗 (頂部鈕與大按鈕)
@@ -1313,6 +1336,75 @@ class App {
       uiController.showToast('邀請連結已複製！隊友點開可自動帶入密碼加入', 'success');
     } catch (e) {
       uiController.showToast(`邀請網址: ${inviteUrl.toString()}`, 'info');
+    }
+  }
+
+  /**
+   * 初始化 PWA 漸進式網頁應用程式 (Service Worker + 安裝事件攔截)
+   */
+  initServiceWorkerAndPWA() {
+    // 1. 註冊 Service Worker 實現本機快取與離線加速
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => {
+            console.log('[PWA] Service Worker 註冊成功，範圍:', reg.scope);
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    uiController.showToast('🚀 發現新版本程式，已為您自動快取加速！', 'info');
+                  }
+                });
+              }
+            });
+          })
+          .catch((err) => {
+            console.warn('[PWA] Service Worker 註冊略過:', err);
+          });
+      });
+    }
+
+    // 2. 攔截 beforeinstallprompt 事件 (Chrome / Edge / Android)
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this.deferredPrompt = e;
+      console.log('[PWA] 已捕獲安裝事件 (beforeinstallprompt)');
+    });
+
+    // 3. 監聽已安裝成功事件
+    window.addEventListener('appinstalled', () => {
+      this.deferredPrompt = null;
+      console.log('[PWA] 已成功安裝為本機獨立 App');
+      uiController.showToast('🎉 已成功安裝為獨立 App！可直接從手機桌面開啟', 'success');
+    });
+  }
+
+  /**
+   * 觸發 PWA 安裝程序 (跨平台智慧適配)
+   */
+  triggerPwaInstall() {
+    // 檢查是否已在獨立 App 模式下運行
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone) {
+      uiController.showToast('📱 您已在獨立 App 模式下運行！', 'info');
+      return;
+    }
+
+    // 若瀏覽器已準備好原生安裝提示 (Android / Chrome / Edge)
+    if (this.deferredPrompt) {
+      this.deferredPrompt.prompt();
+      this.deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          uiController.showToast('📲 正在安裝為桌面應用程式...', 'success');
+        }
+        this.deferredPrompt = null;
+      });
+    } else {
+      // iOS Safari 或尚未觸發原生 prompt，開啟圖文操作導引
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      uiController.openPwaGuideModal(isIOS);
     }
   }
 

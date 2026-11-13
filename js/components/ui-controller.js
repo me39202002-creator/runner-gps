@@ -43,6 +43,16 @@ class UIController {
       btnPocketMode: document.getElementById('btn-pocket-mode'),
       btnPocketModeMobile: document.getElementById('btn-pocket-mode-mobile'),
 
+      // PWA 相關
+      btnPwaInstall: document.getElementById('btn-pwa-install'),
+      btnPwaInstallMobile: document.getElementById('btn-pwa-install-mobile'),
+      btnSettingsInstallPwa: document.getElementById('btn-settings-install-pwa'),
+      pwaGuideModal: document.getElementById('pwa-guide-modal'),
+      pwaIosInstructions: document.getElementById('pwa-ios-instructions'),
+      pwaAndroidInstructions: document.getElementById('pwa-android-instructions'),
+      btnPwaConfirmInstall: document.getElementById('btn-pwa-confirm-install'),
+      btnClosePwaGuide: document.getElementById('btn-close-pwa-guide'),
+
       // 跑者狀態條
       roleBadge: document.getElementById('role-badge'),
       stripRunnerAvatar: document.getElementById('strip-runner-avatar'),
@@ -895,6 +905,31 @@ class UIController {
       this.elements.joinModal.classList.remove('hidden');
     } else {
       this.elements.joinModal.classList.add('hidden');
+    }
+  }
+
+  /**
+   * 開啟 PWA 安裝指引彈窗
+   * @param {boolean} isIOS 是否為 iOS 裝置
+   */
+  openPwaGuideModal(isIOS = true) {
+    if (!this.elements.pwaGuideModal) return;
+    this.elements.pwaGuideModal.classList.remove('hidden');
+    if (isIOS) {
+      if (this.elements.pwaIosInstructions) this.elements.pwaIosInstructions.classList.remove('hidden');
+      if (this.elements.pwaAndroidInstructions) this.elements.pwaAndroidInstructions.classList.add('hidden');
+    } else {
+      if (this.elements.pwaIosInstructions) this.elements.pwaIosInstructions.classList.add('hidden');
+      if (this.elements.pwaAndroidInstructions) this.elements.pwaAndroidInstructions.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * 關閉 PWA 安裝指引彈窗
+   */
+  closePwaGuideModal() {
+    if (this.elements.pwaGuideModal) {
+      this.elements.pwaGuideModal.classList.add('hidden');
     }
   }
 }
