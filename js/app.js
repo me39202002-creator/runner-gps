@@ -466,6 +466,24 @@ class App {
       el.btnToggleVirtual.addEventListener('click', () => this.toggleVirtualRunners());
     }
 
+    // 監聽螢幕點亮或重新回到網頁 (Visibility Change) 即刻恢復在線並補發 GPS
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[App] 螢幕重新點亮/回到前台，立即補發在線心跳與 GPS 定位');
+        firebaseService.sendHeartbeat();
+        if (this.latestSelfCoords) {
+          this.handleLocationUpdate(this.latestSelfCoords);
+        }
+        if ('geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => geolocationService.ingestPosition(pos),
+            (err) => console.warn('[App] 喚醒 GPS 補發警告:', err),
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+          );
+        }
+      }
+    });
+
     // 聚集伴跑隊友
     if (el.btnGatherTeam) {
       el.btnGatherTeam.addEventListener('click', () => this.gatherVirtualRunners());

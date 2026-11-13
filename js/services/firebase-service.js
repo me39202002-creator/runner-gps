@@ -59,6 +59,22 @@ class FirebaseService {
       this.connectedRef = ref(this.db, '.info/connected');
       onValue(this.connectedRef, (snapshot) => {
         this.isConnected = snapshot.val() === true;
+        if (this.isConnected && this.currentRoomId && this.currentRunnerId) {
+          // 當手機解鎖、網路喚醒或重連時，即刻重新掛載 onDisconnect 並將自己設定為在線 (isOnline: true)
+          try {
+            const myRunnerRef = ref(this.db, `rooms/${this.currentRoomId}/runners/${this.currentRunnerId}`);
+            onDisconnect(myRunnerRef).update({
+              isOnline: false,
+              lastSeen: serverTimestamp()
+            });
+            update(myRunnerRef, {
+              isOnline: true,
+              lastSeen: serverTimestamp()
+            });
+          } catch (e) {
+            console.warn('[FirebaseService] 重連狀態恢復警告:', e);
+          }
+        }
         if (typeof this.onConnectionStatusChangeCallback === 'function') {
           this.onConnectionStatusChangeCallback(this.isConnected);
         }
