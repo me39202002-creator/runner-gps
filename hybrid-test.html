@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>混合室內外定位引擎 (HybridLocationEngine) 測試面板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #0b1329;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .compass-disc {
+      transition: transform 0.15s cubic-bezier(0.1, 0.9, 0.2, 1);
+    }
+    .source-badge {
+      transition: all 0.3s ease;
+    }
+  </style>
+</head>
+<body class="p-3 sm:p-6 max-w-xl mx-auto space-y-4">
+
+  <!-- 頂部標題列 -->
+  <header class="text-center space-y-1">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold">
+      <span>🛰️ 雙模定位</span>
+      <span>•</span>
+      <span>室內外無縫接軌</span>
+    </div>
+    <h1 class="text-xl sm:text-2xl font-black text-white">HybridLocationEngine 測試</h1>
+    <p class="text-xs text-slate-400">P1 藍牙錨點 ➔ P2 GPS 戶外 ➔ P3 PDR 慣性 ➔ P4 基地台邊界</p>
+  </header>
+
+  <!-- 1. 權限與控制按鈕 -->
+  <div class="bg-[#141f36] border border-slate-700/80 rounded-2xl p-4 space-y-3 shadow-lg">
+    <div class="text-xs font-bold text-slate-300 flex items-center justify-between">
+      <span>🔑 系統授權與保活控制</span>
+      <span id="txt-engine-state" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">STOPPED</span>
+    </div>
+    
+    <div class="grid grid-cols-2 gap-2.5">
+      <button id="btn-request-perms" type="button" class="py-2.5 px-3 rounded-xl bg-teal-400 hover:bg-teal-500 active:scale-95 text-slate-950 font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5">
+        <span>⚡ 授權感測器 & 保活</span>
+      </button>
+
+      <button id="btn-toggle-engine" type="button" class="py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5">
+        <span id="btn-toggle-icon">▶</span>
+        <span id="btn-toggle-text">啟動定位引擎</span>
+      </button>
+    </div>
+
+    <!-- 藍牙掃描按鈕 (P1) -->
+    <div class="pt-1 border-t border-slate-800/80 flex items-center justify-between gap-2">
+      <div class="text-[11px] text-slate-400">
+        P1 藍牙錨點掃描 (需支援 Web BLE):
+      </div>
+      <button id="btn-scan-ble" type="button" class="py-1.5 px-3 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold active:scale-95 transition">
+        <span>📡 掃描 BLE 錨點</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. 主導地位顯示看板 (Dominant Source HUD) -->
+  <div class="bg-[#141f36] border border-slate-700/80 rounded-2xl p-4 space-y-3.5 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div class="text-xs font-bold text-slate-300">📍 當前主導定位來源 (Source)</div>
+      <div id="badge-source" class="source-badge px-3 py-1 rounded-full text-xs font-extrabold uppercase bg-slate-800 text-slate-400 border border-slate-700">
+        等待定位中
+      </div>
+    </div>
+
+    <!-- 經緯度大字看板 -->
+    <div class="grid grid-cols-2 gap-3 bg-[#0c1424] rounded-xl p-3 border border-slate-800">
+      <div>
+        <div class="text-[10px] text-slate-400 font-medium">當前緯度 (Latitude)</div>
+        <div id="disp-lat" class="text-base sm:text-lg font-mono font-bold text-teal-300">--.------</div>
+      </div>
+      <div>
+        <div class="text-[10px] text-slate-400 font-medium">當前經度 (Longitude)</div>
+        <div id="disp-lng" class="text-base sm:text-lg font-mono font-bold text-teal-300">--.------</div>
+      </div>
+      <div>
+        <div class="text-[10px] text-slate-400 font-medium">精準度半徑 (Accuracy)</div>
+        <div id="disp-accuracy" class="text-sm font-mono font-bold text-amber-400">± -- m</div>
+      </div>
+      <div>
+        <div class="text-[10px] text-slate-400 font-medium">最後更新時間</div>
+        <div id="disp-time" class="text-sm font-mono text-slate-300">--:--:--</div>
+      </div>
+    </div>
+
+    <!-- 慣導資訊 (P3 PDR) -->
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div class="bg-[#0c1424] p-2.5 rounded-xl border border-slate-800">
+        <div class="text-[10px] text-slate-400">羅盤航向</div>
+        <div class="flex items-center justify-center gap-1 mt-0.5">
+          <div id="compass-arrow" class="compass-disc inline-block text-base">🧭</div>
+          <span id="disp-heading" class="text-sm font-bold text-white font-mono">0°</span>
+        </div>
+      </div>
+
+      <div class="bg-[#0c1424] p-2.5 rounded-xl border border-slate-800">
+        <div class="text-[10px] text-slate-400">PDR 累計步伐</div>
+        <div class="text-base font-extrabold text-emerald-400 font-mono mt-0.5" id="disp-steps">
+          0 步
+        </div>
+      </div>
+
+      <div class="bg-[#0c1424] p-2.5 rounded-xl border border-slate-800">
+        <div class="text-[10px] text-slate-400">最新錨點起點</div>
+        <div class="text-[11px] font-bold text-sky-400 font-mono mt-1 truncate" id="disp-anchor">
+          無
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 室內外模擬與測試控制 (方便在電腦/室內桌前驗證) -->
+  <div class="bg-[#141f36] border border-slate-700/80 rounded-2xl p-4 space-y-2.5 shadow-lg">
+    <div class="text-xs font-bold text-slate-300 flex items-center justify-between">
+      <span>🧪 室內外模擬切換測試</span>
+      <span class="text-[10px] text-slate-500">免走動即可驗證狀態機</span>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2">
+      <button id="btn-mock-gps-good" type="button" class="py-2 px-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 text-xs font-semibold active:scale-95 transition">
+        模擬 P2 高精度
+      </button>
+
+      <button id="btn-mock-indoor" type="button" class="py-2 px-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-semibold active:scale-95 transition">
+        模擬進室內斷訊
+      </button>
+
+      <button id="btn-mock-step" type="button" class="py-2 px-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold active:scale-95 transition">
+        模擬手動走 1 步
+      </button>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2 pt-1">
+      <button id="btn-mock-ble-snap" type="button" class="py-2 px-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-semibold active:scale-95 transition">
+        模擬觸碰 P1 藍牙錨點
+      </button>
+
+      <button id="btn-mock-cell-drift" type="button" class="py-2 px-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-semibold active:scale-95 transition">
+        模擬 P4 基地台拉回
+      </button>
+    </div>
+  </div>
+
+  <!-- 4. 即時狀態機與除錯日誌 -->
+  <div class="bg-[#141f36] border border-slate-700/80 rounded-2xl p-4 space-y-2 shadow-lg">
+    <div class="flex items-center justify-between text-xs font-bold text-slate-300">
+      <span>📝 引擎即時事件日誌</span>
+      <button id="btn-clear-log" type="button" class="text-[10px] text-slate-400 hover:text-slate-200">清除日誌</button>
+    </div>
+    <div id="log-box" class="h-44 overflow-y-auto bg-[#070d19] rounded-xl p-2.5 font-mono text-[11px] leading-relaxed space-y-1 text-slate-300 border border-slate-800">
+      <div class="text-slate-500">等待引擎啟動中...</div>
+    </div>
+  </div>
+
+  <!-- 引入 HybridLocationEngine 模組 -->
+  <script type="module">
+    import { HybridLocationEngine } from './HybridLocationEngine.js';
+
+    // 預設測試用 Beacon 資料庫
+    const DEMO_BEACONS = {
+      'beacon_gate_1': { lat: 25.033964, lng: 121.564468, name: '101大樓正門 Beacon' },
+      'beacon_office_3f': { lat: 25.034200, lng: 121.564800, name: '3F 辦公室走廊' }
+    };
+
+    // UI 元素
+    const el = {
+      btnRequestPerms: document.getElementById('btn-request-perms'),
+      btnToggleEngine: document.getElementById('btn-toggle-engine'),
+      btnToggleIcon: document.getElementById('btn-toggle-icon'),
+      btnToggleText: document.getElementById('btn-toggle-text'),
+      btnScanBle: document.getElementById('btn-scan-ble'),
+      txtEngineState: document.getElementById('txt-engine-state'),
+      badgeSource: document.getElementById('badge-source'),
+      dispLat: document.getElementById('disp-lat'),
+      dispLng: document.getElementById('disp-lng'),
+      dispAccuracy: document.getElementById('disp-accuracy'),
+      dispTime: document.getElementById('disp-time'),
+      dispHeading: document.getElementById('disp-heading'),
+      compassArrow: document.getElementById('compass-arrow'),
+      dispSteps: document.getElementById('disp-steps'),
+      dispAnchor: document.getElementById('disp-anchor'),
+      logBox: document.getElementById('log-box'),
+      btnClearLog: document.getElementById('btn-clear-log'),
+
+      // 模擬按鈕
+      btnMockGpsGood: document.getElementById('btn-mock-gps-good'),
+      btnMockIndoor: document.getElementById('btn-mock-indoor'),
+      btnMockStep: document.getElementById('btn-mock-step'),
+      btnMockBleSnap: document.getElementById('btn-mock-ble-snap'),
+      btnMockCellDrift: document.getElementById('btn-mock-cell-drift')
+    };
+
+    // 建立定位引擎實例
+    const engine = new HybridLocationEngine({
+      stepLength: 0.7,
+      stepCooldown: 350,
+      highAccuracyThreshold: 15,
+      bleRssiThreshold: -70,
+
+      // 定位更新回呼
+      onLocationUpdate: (loc) => {
+        updateLocationUI(loc);
+      },
+
+      // 狀態機切換回呼
+      onStateChange: ({ state, oldState, reason }) => {
+        el.txtEngineState.textContent = state;
+        appendLog(`[狀態切換] ${oldState} ➔ ${state} (${reason})`, 'text-sky-300 font-bold');
+      },
+
+      // 日誌回呼
+      onLog: (msg, level) => {
+        let colorClass = 'text-slate-300';
+        if (level === 'warn') colorClass = 'text-amber-300';
+        if (level === 'error') colorClass = 'text-rose-400 font-bold';
+        if (level === 'debug') colorClass = 'text-slate-500';
+        appendLog(msg, colorClass);
+      }
+    });
+
+    // 1. 權限按鈕事件
+    el.btnRequestPerms.addEventListener('click', async () => {
+      appendLog('👉 使用者觸發權限申請...', 'text-teal-300');
+      const res = await engine.initPermissions();
+      appendLog(`體感: ${res.motion} | 羅盤: ${res.orientation} | 常亮: ${res.wakeLock} | BLE: ${res.bluetooth}`, 'text-teal-400');
+      alert(`授權結果：\n- 體感加速度計: ${res.motion ? '允許' : '略過/未允許'}\n- 絕對羅盤: ${res.orientation ? '允許' : '略過/未允許'}\n- 螢幕防休眠 WakeLock: ${res.wakeLock ? '成功鎖定' : '不支援/失敗'}\n- 藍牙環境: ${res.bluetooth ? '支援' : '不支援(iOS)'}`);
+    });
+
+    // 2. 啟動/停止切換
+    el.btnToggleEngine.addEventListener('click', () => {
+      if (!engine.isRunning) {
+        engine.start(DEMO_BEACONS);
+        el.btnToggleIcon.textContent = '⏹';
+        el.btnToggleText.textContent = '停止定位引擎';
+        el.btnToggleEngine.classList.replace('bg-emerald-500', 'bg-rose-600');
+        el.btnToggleEngine.classList.replace('hover:bg-emerald-600', 'hover:bg-rose-700');
+      } else {
+        engine.stop();
+        el.btnToggleIcon.textContent = '▶';
+        el.btnToggleText.textContent = '啟動定位引擎';
+        el.btnToggleEngine.classList.replace('bg-rose-600', 'bg-emerald-500');
+        el.btnToggleEngine.classList.replace('hover:bg-rose-700', 'hover:bg-emerald-600');
+      }
+    });
+
+    // 3. 掃描 BLE 錨點
+    el.btnScanBle.addEventListener('click', async () => {
+      appendLog('🔍 啟動 BLE Beacon 掃描...', 'text-indigo-300');
+      const ok = await engine.scanBluetoothBeacons(DEMO_BEACONS);
+      if (!ok) {
+        appendLog('BLE 掃描略過或當前瀏覽器限制，可透過下方「模擬」按鈕測試 P1 錨定效果', 'text-amber-400');
+      }
+    });
+
+    // 4. 清除日誌
+    el.btnClearLog.addEventListener('click', () => {
+      el.logBox.innerHTML = '';
+    });
+
+    // UI 更新函式
+    function updateLocationUI(loc) {
+      el.dispLat.textContent = loc.lat.toFixed(6);
+      el.dispLng.textContent = loc.lng.toFixed(6);
+      el.dispAccuracy.textContent = `± ${loc.accuracy ? loc.accuracy.toFixed(1) : '--'} m`;
+      el.dispTime.textContent = new Date(loc.timestamp).toLocaleTimeString();
+      el.dispSteps.textContent = `${loc.steps || 0} 步`;
+
+      if (typeof loc.heading === 'number') {
+        el.dispHeading.textContent = `${Math.round(loc.heading)}°`;
+        el.compassArrow.style.transform = `rotate(${loc.heading}deg)`;
+      }
+
+      if (engine.anchorLocation) {
+        el.dispAnchor.textContent = `${engine.anchorLocation.source} (${engine.anchorLocation.lat.toFixed(4)}, ${engine.anchorLocation.lng.toFixed(4)})`;
+      }
+
+      // 更新主導地位 Badge 顏色與文字
+      updateBadge(loc.source);
+    }
+
+    function updateBadge(source) {
+      const b = el.badgeSource;
+      b.className = 'source-badge px-3 py-1 rounded-full text-xs font-extrabold uppercase border shadow-md';
+      
+      switch (source) {
+        case 'BLE':
+          b.className += ' bg-purple-500/20 text-purple-300 border-purple-500/50 shadow-purple-500/20';
+          b.textContent = 'P1 藍牙精確錨點 (BLE)';
+          break;
+        case 'GPS':
+          b.className += ' bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-emerald-500/20';
+          b.textContent = 'P2 戶外高精度 GPS';
+          break;
+        case 'PDR':
+          b.className += ' bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-amber-500/20';
+          b.textContent = 'P3 室內慣性推算 (PDR)';
+          break;
+        case 'CELL_CORRECTED':
+          b.className += ' bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sky-500/20';
+          b.textContent = 'P4 基地台平滑校正';
+          break;
+        default:
+          b.className += ' bg-slate-800 text-slate-400 border-slate-700';
+          b.textContent = source;
+          break;
+      }
+    }
+
+    function appendLog(msg, colorClass = 'text-slate-300') {
+      const line = document.createElement('div');
+      line.className = colorClass;
+      line.textContent = msg;
+      el.logBox.appendChild(line);
+      el.logBox.scrollTop = el.logBox.scrollHeight;
+    }
+
+    // =========================================================================
+    // 模擬測試按鈕功能 (便於未到戶外時展示狀態機運作)
+    // =========================================================================
+    el.btnMockGpsGood.addEventListener('click', () => {
+      appendLog('🧪 [模擬] 注入戶外高品質 GPS 座標 (Accuracy: 5.0m)...', 'text-emerald-400 font-bold');
+      engine.handleGeolocationSuccess({
+        coords: {
+          latitude: 25.033964,
+          longitude: 121.564468,
+          accuracy: 5.0,
+          heading: 90
+        }
+      });
+    });
+
+    el.btnMockIndoor.addEventListener('click', () => {
+      appendLog('🧪 [模擬] 走入室內 / 隧道，GPS 訊號中斷...', 'text-amber-400 font-bold');
+      engine.lastGpsTimestamp = 0; // 強制看門狗判定為超時
+      engine.evaluateGpsWatchdog();
+    });
+
+    el.btnMockStep.addEventListener('click', () => {
+      appendLog('🧪 [模擬] 走動 1 步 (觸發 PDR 航位推算)...', 'text-teal-300');
+      engine.onStepDetected(Date.now());
+    });
+
+    el.btnMockBleSnap.addEventListener('click', () => {
+      appendLog('🧪 [模擬] 靠近 101 大樓正門 Beacon (RSSI: -58 dBm)...', 'text-purple-300 font-bold');
+      engine.snapToBleAnchor(DEMO_BEACONS['beacon_gate_1'], -58);
+    });
+
+    el.btnMockCellDrift.addEventListener('click', () => {
+      appendLog('🧪 [模擬] PDR 漂移過大，收到遠處基地台訊號觸發 P4 平滑拉回...', 'text-sky-300 font-bold');
+      engine.state = 'INDOOR_PDR';
+      engine.handleGeolocationSuccess({
+        coords: {
+          latitude: 25.035500, // 偏離約 150m
+          longitude: 121.565800,
+          accuracy: 45.0 // 粗略精度
+        }
+      });
+    });
+  </script>
+</body>
+</html>

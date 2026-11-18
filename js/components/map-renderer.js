@@ -7,6 +7,7 @@
 
 import { createSafeElement } from '../security.js';
 import { formatPace } from '../services/geolocation-service.js';
+import { batteryService } from '../services/battery-service.js';
 
 // Google 地圖深藍夜間模式配色方案
 const DARK_MAP_STYLES = [
@@ -67,6 +68,11 @@ class MapRenderer {
     this.runners = new Map();
     this.selfRunnerId = null;
     this.activeInfoWindow = null;
+    this.onQuickShoutCallback = null;
+  }
+
+  setOnQuickShout(callback) {
+    this.onQuickShoutCallback = callback;
   }
 
   /**
@@ -169,23 +175,78 @@ class MapRenderer {
   }
 
   /**
-   * 安全建立 InfoWindow 內容
+   * 安全建立 InfoWindow 內容 (含跑友即時電量與一鍵喊話快捷鍵)
    */
-  createSafeInfoWindowContent(runner) {
+  createSafeInfoWindowContent(runner, isSelf = false) {
     const isOnline = runner.isOnline !== false;
     const speedStr = runner.speed ? `${(runner.speed * 3.6).toFixed(1)} km/h` : '靜止中';
     const paceStr = formatPace(runner.speed);
     const distStr = `${((runner.totalDistanceMeters || 0) / 1000).toFixed(1)} km`;
 
-    return createSafeElement('div', { class: 'p-2 min-w-[170px] bg-[#131E32] text-white rounded-xl font-sans text-xs space-y-1.5' }, [
-      createSafeElement('div', { class: 'flex items-center gap-2 border-b border-slate-700 pb-1.5' }, [
+    // 格式化跑友電量
+    const bat = batteryService.formatBattery(runner.battery);
+
+    // 快速喊話按鈕區 (針對隊友，點擊可直接發送語音/泡泡)
+    let shoutActions = null;
+    if (!isSelf && this.onQuickShoutCallback) {
+      shoutActions = createSafeElement('div', { class: 'pt-2 border-t border-slate-700/80 space-y-1.5' }, [
+        createSafeElement('div', { class: 'text-[10px] text-teal-400 font-bold flex items-center gap-1' }, [
+          createSafeElement('span', {}, '💬'),
+          createSafeElement('span', {}, '一鍵對他喊話：')
+        ]),
+        createSafeElement('div', { class: 'grid grid-cols-2 gap-1 text-[11px]' }, [
+          createSafeElement('button', {
+            type: 'button',
+            class: 'p-1 px-1.5 rounded-lg bg-teal-500/15 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 font-semibold transition active:scale-95 text-center',
+            'data-shout': '大家加油！最後衝刺！',
+            'data-type': 'cheer'
+          }, '🏃‍♂️ 加油衝刺'),
+          createSafeElement('button', {
+            type: 'button',
+            class: 'p-1 px-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-semibold transition active:scale-95 text-center',
+            'data-shout': '等我一下！放慢配速',
+            'data-type': 'wait'
+          }, '🛑 等我一下'),
+          createSafeElement('button', {
+            type: 'button',
+            class: 'p-1 px-1.5 rounded-lg bg-sky-500/15 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 font-semibold transition active:scale-95 text-center',
+            'data-shout': '我在補給站等大家',
+            'data-type': 'supply'
+          }, '🥤 補給站見'),
+          createSafeElement('button', {
+            type: 'button',
+            class: 'p-1 px-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 font-semibold transition active:scale-95 text-center',
+            'data-shout': '注意前方路況，小心紅燈！',
+            'data-type': 'warning'
+          }, '⚠️ 注意路況')
+        ])
+      ]);
+
+      // 綁定喊話點擊
+      shoutActions.querySelectorAll('button[data-shout]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const text = btn.dataset.shout;
+          const type = btn.dataset.type;
+          this.onQuickShoutCallback(text, type, runner.id || null);
+          if (this.activeInfoWindow) this.activeInfoWindow.close();
+        });
+      });
+    }
+
+    return createSafeElement('div', { class: 'p-2 min-w-[190px] bg-[#131E32] text-white rounded-xl font-sans text-xs space-y-1.5' }, [
+      // 標題列：頭像、暱稱、電量標籤、在線狀態
+      createSafeElement('div', { class: 'flex items-center gap-1.5 border-b border-slate-700 pb-1.5' }, [
         createSafeElement('span', { class: 'text-lg' }, runner.avatar || '🏃'),
-        createSafeElement('span', { class: 'font-bold text-sm text-teal-300 truncate' }, runner.name || '跑友'),
+        createSafeElement('span', { class: 'font-bold text-sm text-teal-300 truncate max-w-[90px]' }, runner.name || '跑友'),
+        // 電量膠囊標籤
         createSafeElement('span', {
-          class: `text-[10px] px-1.5 py-0.5 rounded-full ml-auto ${
-            isOnline ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
-          }`
-        }, isOnline ? '在線' : '離線')
+          class: `text-[10px] px-1.5 py-0.5 rounded font-mono ${bat.badgeBg} ${bat.colorClass} border ${bat.badgeBorder} flex items-center gap-0.5 ml-auto`
+        }, `${bat.icon} ${bat.text}`),
+        // 在線狀態點
+        createSafeElement('span', {
+          class: `w-2 h-2 rounded-full flex-shrink-0 ${isOnline ? 'bg-emerald-400' : 'bg-slate-500'}`
+        })
       ]),
       createSafeElement('div', { class: 'flex justify-between text-slate-300' }, [
         createSafeElement('span', { class: 'text-slate-400' }, '即時配速:'),
@@ -198,8 +259,9 @@ class MapRenderer {
       createSafeElement('div', { class: 'flex justify-between text-slate-300' }, [
         createSafeElement('span', { class: 'text-slate-400' }, '累積里程:'),
         createSafeElement('span', { class: 'font-mono font-semibold' }, distStr)
-      ])
-    ]);
+      ]),
+      shoutActions
+    ].filter(Boolean));
   }
 
   /**
@@ -234,12 +296,12 @@ class MapRenderer {
       });
 
       const infoWindow = new google.maps.InfoWindow({
-        content: this.createSafeInfoWindowContent(runnerData)
+        content: this.createSafeInfoWindowContent(runnerData, isSelf)
       });
 
       marker.addListener('click', () => {
         if (this.activeInfoWindow) this.activeInfoWindow.close();
-        infoWindow.setContent(this.createSafeInfoWindowContent(runnerData));
+        infoWindow.setContent(this.createSafeInfoWindowContent(runnerData, isSelf));
         infoWindow.open(this.map, marker);
         this.activeInfoWindow = infoWindow;
       });
@@ -258,7 +320,7 @@ class MapRenderer {
         });
       }
 
-      runnerObj = { marker, polyline, infoWindow, accuracyCircle, lastPos: pos };
+      runnerObj = { marker, polyline, infoWindow, accuracyCircle, lastPos: pos, shoutOverlay: null, shoutTimer: null };
       this.runners.set(runnerId, runnerObj);
     } else {
       runnerObj.marker.setPosition(pos);
@@ -277,13 +339,105 @@ class MapRenderer {
         }
       }
 
+      // 若當前跑友頭頂正有語音泡泡，隨跑友座標即時更新位置
+      if (runnerObj.shoutOverlay) {
+        runnerObj.shoutOverlay.setPosition(pos);
+      }
+
       runnerObj.lastPos = pos;
     }
+  }
+
+  /**
+   * 在跑友地圖標記上方顯示動態氣泡 (Speech Bubble)
+   * @param {string} runnerId 
+   * @param {string} text 喊話內容
+   * @param {string} avatar 跑友圖示
+   */
+  showShoutBubble(runnerId, text, avatar = '🏃') {
+    if (!this.map || !window.google || !window.google.maps) return;
+    const runnerObj = this.runners.get(runnerId);
+    if (!runnerObj || !runnerObj.lastPos) return;
+
+    // 清除該跑友先前的泡泡
+    if (runnerObj.shoutTimer) {
+      clearTimeout(runnerObj.shoutTimer);
+      runnerObj.shoutTimer = null;
+    }
+    if (runnerObj.shoutOverlay) {
+      runnerObj.shoutOverlay.setMap(null);
+      runnerObj.shoutOverlay = null;
+    }
+
+    // 建立 Google Maps 自訂 Overlay 類別 (若尚未定義)
+    if (!this.ShoutOverlayClass) {
+      this.ShoutOverlayClass = class extends google.maps.OverlayView {
+        constructor(position, contentNode, mapInstance) {
+          super();
+          this.position = position;
+          this.contentNode = contentNode;
+          this.div = null;
+          this.setMap(mapInstance);
+        }
+
+        onAdd() {
+          this.div = document.createElement('div');
+          this.div.className = 'runner-shout-overlay';
+          this.div.appendChild(this.contentNode);
+          const panes = this.getPanes();
+          if (panes && panes.overlayMouseTarget) {
+            panes.overlayMouseTarget.appendChild(this.div);
+          }
+        }
+
+        draw() {
+          const overlayProjection = this.getProjection();
+          if (!overlayProjection || !this.div || !this.position) return;
+          const point = overlayProjection.fromLatLngToDivPixel(this.position);
+          if (point) {
+            this.div.style.left = point.x + 'px';
+            this.div.style.top = (point.y - 60) + 'px';
+          }
+        }
+
+        setPosition(pos) {
+          this.position = pos;
+          this.draw();
+        }
+
+        onRemove() {
+          if (this.div && this.div.parentNode) {
+            this.div.parentNode.removeChild(this.div);
+            this.div = null;
+          }
+        }
+      };
+    }
+
+    // 建立安全泡泡 DOM 結構
+    const bubbleEl = createSafeElement('div', { class: 'runner-shout-bubble' }, [
+      createSafeElement('span', { class: 'text-sm' }, avatar || '🏃'),
+      createSafeElement('span', { class: 'truncate max-w-[160px]' }, text)
+    ]);
+
+    const overlay = new this.ShoutOverlayClass(runnerObj.lastPos, bubbleEl, this.map);
+    runnerObj.shoutOverlay = overlay;
+
+    // 6 秒後自動淡出移除
+    runnerObj.shoutTimer = setTimeout(() => {
+      if (runnerObj.shoutOverlay) {
+        runnerObj.shoutOverlay.setMap(null);
+        runnerObj.shoutOverlay = null;
+      }
+      runnerObj.shoutTimer = null;
+    }, 6000);
   }
 
   removeRunner(runnerId) {
     const runnerObj = this.runners.get(runnerId);
     if (runnerObj) {
+      if (runnerObj.shoutTimer) clearTimeout(runnerObj.shoutTimer);
+      if (runnerObj.shoutOverlay) runnerObj.shoutOverlay.setMap(null);
       if (runnerObj.marker) runnerObj.marker.setMap(null);
       if (runnerObj.polyline) runnerObj.polyline.setMap(null);
       if (runnerObj.accuracyCircle) runnerObj.accuracyCircle.setMap(null);
@@ -299,6 +453,8 @@ class MapRenderer {
   clearAllRunners(keepSelf = false) {
     this.runners.forEach((runnerObj, id) => {
       if (keepSelf && id === this.selfRunnerId) return;
+      if (runnerObj.shoutTimer) clearTimeout(runnerObj.shoutTimer);
+      if (runnerObj.shoutOverlay) runnerObj.shoutOverlay.setMap(null);
       if (runnerObj.marker) runnerObj.marker.setMap(null);
       if (runnerObj.polyline) runnerObj.polyline.setMap(null);
       if (runnerObj.accuracyCircle) runnerObj.accuracyCircle.setMap(null);

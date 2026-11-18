@@ -8,6 +8,8 @@
 import { createSafeElement, escapeHTML } from '../security.js';
 import { formatPace } from '../services/geolocation-service.js';
 import { backgroundTrackingService } from '../services/background-tracking-service.js';
+import { batteryService } from '../services/battery-service.js';
+import { speechService } from '../services/speech-service.js';
 
 class UIController {
   constructor() {
@@ -43,15 +45,6 @@ class UIController {
       btnPocketMode: document.getElementById('btn-pocket-mode'),
       btnPocketModeMobile: document.getElementById('btn-pocket-mode-mobile'),
 
-      // PWA 相關
-      btnPwaInstall: document.getElementById('btn-pwa-install'),
-      btnPwaInstallMobile: document.getElementById('btn-pwa-install-mobile'),
-      btnSettingsInstallPwa: document.getElementById('btn-settings-install-pwa'),
-      pwaGuideModal: document.getElementById('pwa-guide-modal'),
-      pwaIosInstructions: document.getElementById('pwa-ios-instructions'),
-      pwaAndroidInstructions: document.getElementById('pwa-android-instructions'),
-      btnPwaConfirmInstall: document.getElementById('btn-pwa-confirm-install'),
-      btnClosePwaGuide: document.getElementById('btn-close-pwa-guide'),
 
       // 跑者狀態條
       roleBadge: document.getElementById('role-badge'),
@@ -60,6 +53,9 @@ class UIController {
       btnEditMyNickname: document.getElementById('btn-edit-my-nickname'),
       stripPace: document.getElementById('strip-pace'),
       stripSpeed: document.getElementById('strip-speed'),
+      stripBatteryBadge: document.getElementById('strip-battery-badge'),
+      stripBatteryIcon: document.getElementById('strip-battery-icon'),
+      stripBatteryText: document.getElementById('strip-battery-text'),
       stripRunningPhase: document.getElementById('strip-running-phase'),
       teamRealCount: document.getElementById('team-real-count'),
       btnJumpTeam: document.getElementById('btn-jump-team'),
@@ -73,6 +69,7 @@ class UIController {
       btnSaveNickname: document.getElementById('btn-save-nickname'),
 
       // 地圖浮動控制
+      btnQuickShout: document.getElementById('btn-quick-shout'),
       mapRunnerRatio: document.getElementById('map-runner-ratio'),
       btnMapRoadmap: document.getElementById('btn-map-roadmap'),
       btnMapSatellite: document.getElementById('btn-map-satellite'),
@@ -89,11 +86,9 @@ class UIController {
       dashOnlineCount: document.getElementById('dash-online-count'),
       btnCopyRoom: document.getElementById('btn-copy-room'),
       btnInviteModal: document.getElementById('btn-invite-modal'),
-      btnToggleVirtual: document.getElementById('btn-toggle-virtual'),
       statTeamDistance: document.getElementById('stat-team-distance'),
       statActiveRunners: document.getElementById('stat-active-runners'),
       statOnlineNum: document.getElementById('stat-online-num'),
-      btnGatherTeam: document.getElementById('btn-gather-team'),
       leaderboardContainer: document.getElementById('leaderboard-container'),
       footerRoomId: document.getElementById('footer-room-id'),
       btnLeaveTeam: document.getElementById('btn-leave-team'),
@@ -156,7 +151,15 @@ class UIController {
       btnSaveSettings: document.getElementById('btn-save-settings'),
 
       // Toast 容器
-      toastContainer: document.getElementById('toast-container')
+      toastContainer: document.getElementById('toast-container'),
+
+      // 快捷語音喊話彈窗
+      quickShoutModal: document.getElementById('quick-shout-modal'),
+      btnCloseQuickShout: document.getElementById('btn-close-quick-shout'),
+      btnToggleTts: document.getElementById('btn-toggle-tts'),
+      ttsIcon: document.getElementById('tts-icon'),
+      inputCustomShout: document.getElementById('input-custom-shout'),
+      btnSendCustomShout: document.getElementById('btn-send-custom-shout')
     };
 
     // 初始化裝置電量監聽 (若瀏覽器支援)
@@ -216,6 +219,13 @@ class UIController {
     }
     if (this.elements.stripSpeed) {
       this.elements.stripSpeed.textContent = `${speedKmh} km/h`;
+    }
+
+    if (this.elements.stripBatteryBadge) {
+      const bat = batteryService.formatBattery(runnerData.battery);
+      if (this.elements.stripBatteryIcon) this.elements.stripBatteryIcon.textContent = bat.icon;
+      if (this.elements.stripBatteryText) this.elements.stripBatteryText.textContent = bat.text;
+      this.elements.stripBatteryBadge.className = `inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-mono ${bat.badgeBg} ${bat.colorClass} border ${bat.badgeBorder}`;
     }
 
     const phase = this.getRunningPhase(speed);
@@ -289,14 +299,14 @@ class UIController {
   /**
    * 更新跑友或新增
    */
-  upsertRunner(runnerId, runnerData, onFocusRunner, onKickRunner = null, isCaptain = false, captainId = null) {
+  upsertRunner(runnerId, runnerData, onFocusRunner, onKickRunner = null, isCaptain = false, captainId = null, onShoutRunner = null) {
     this.cachedRunners.set(runnerId, runnerData);
-    this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain, captainId);
+    this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain, captainId, onShoutRunner);
   }
 
-  removeRunner(runnerId, onFocusRunner, onKickRunner = null, isCaptain = false, captainId = null) {
+  removeRunner(runnerId, onFocusRunner, onKickRunner = null, isCaptain = false, captainId = null, onShoutRunner = null) {
     this.cachedRunners.delete(runnerId);
-    this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain, captainId);
+    this.refreshDashboard(onFocusRunner, onKickRunner, isCaptain, captainId, onShoutRunner);
   }
 
   /**
@@ -316,7 +326,7 @@ class UIController {
   /**
    * 刷新排行榜與三大統計數據卡片 (安全 DOM 渲染)
    */
-  refreshDashboard(onFocusRunner, onKickRunner = null, isCaptain = false, captainId = null) {
+  refreshDashboard(onFocusRunner, onKickRunner = null, isCaptain = false, captainId = null, onShoutRunner = null) {
     const list = Array.from(this.cachedRunners.entries());
     const totalCount = list.length;
     const onlineCount = list.filter(([_, r]) => r.isOnline !== false).length;
@@ -371,7 +381,9 @@ class UIController {
       const kmh = (speed * 3.6).toFixed(1);
       const pace = formatPace(speed).replace(' /km', '');
       const distKm = ((runner.totalDistanceMeters || 0) / 1000).toFixed(1);
-      const batteryStr = runner.battery != null ? `🔋 ${runner.battery}%` : '🔋 100%';
+
+      // 電量格式化
+      const bat = batteryService.formatBattery(runner.battery);
 
       let roleBadge;
       if (isSelf) {
@@ -389,7 +401,7 @@ class UIController {
       }
 
       const card = createSafeElement('div', {
-        class: `p-3 rounded-2xl border transition flex items-center justify-between gap-3 cursor-pointer ${
+        class: `p-3 rounded-2xl border transition flex items-center justify-between gap-2.5 cursor-pointer ${
           isSelf
             ? 'bg-[#18263E] border-teal-500/50 shadow-md shadow-teal-500/5'
             : isOnline
@@ -398,7 +410,7 @@ class UIController {
         }`
       }, [
         // 左側：排名、圖示與跑友資訊
-        createSafeElement('div', { class: 'flex items-center gap-2.5 min-w-0' }, [
+        createSafeElement('div', { class: 'flex items-center gap-2.5 min-w-0 flex-1' }, [
           // 排名序號
           createSafeElement('span', { class: 'text-xs font-mono font-bold text-slate-500 w-4 text-center' }, (idx + 1).toString()),
 
@@ -415,15 +427,17 @@ class UIController {
             })
           ]),
 
-          // 名稱、身份標籤與次要動態
+          // 名稱、身份標籤與次要動態 (含即時電量)
           createSafeElement('div', { class: 'min-w-0' }, [
-            createSafeElement('div', { class: 'flex items-center gap-1.5' }, [
-              createSafeElement('span', { class: 'font-bold text-white text-xs truncate' }, runner.name || '熱血跑友'),
+            createSafeElement('div', { class: 'flex items-center gap-1.5 flex-wrap' }, [
+              createSafeElement('span', { class: 'font-bold text-white text-xs truncate max-w-[100px]' }, runner.name || '熱血跑友'),
               roleBadge
             ]),
-            createSafeElement('div', { class: 'flex items-center gap-2 text-[11px] text-slate-400 mt-0.5' }, [
-              createSafeElement('span', { class: 'text-amber-400 font-medium' }, `● 節奏快跑 ${kmh} km/h`),
-              createSafeElement('span', { class: 'text-slate-500 font-mono text-[10px]' }, batteryStr)
+            createSafeElement('div', { class: 'flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5 flex-wrap' }, [
+              createSafeElement('span', { class: 'text-amber-400 font-medium' }, `● ${kmh} km/h`),
+              createSafeElement('span', {
+                class: `inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded font-mono text-[10px] ${bat.badgeBg} ${bat.colorClass} border ${bat.badgeBorder}`
+              }, `${bat.icon} ${bat.text}`)
             ])
           ])
         ]),
@@ -433,6 +447,18 @@ class UIController {
           createSafeElement('div', { class: 'text-sm font-bold text-teal-400' }, pace),
           createSafeElement('div', { class: 'text-[11px] text-slate-400' }, `${distKm} km`)
         ]),
+
+        // 快捷喊話按鈕 (點擊直接呼叫語音/泡泡選單)
+        !isSelf
+          ? createSafeElement('button', {
+              type: 'button',
+              class: 'p-1.5 px-2 text-[10px] font-bold rounded-lg bg-teal-500/10 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 transition flex items-center gap-1 active:scale-90 flex-shrink-0 ml-1',
+              title: '對此跑友快捷喊話'
+            }, [
+              createSafeElement('span', {}, '💬'),
+              createSafeElement('span', { class: 'hidden sm:inline' }, '喊話')
+            ])
+          : null,
 
         // 隊長專屬：移出/刪除隊友按鈕 (僅隊長看得到，且不顯示在自己身上)
         isCaptain && !isSelf
@@ -446,6 +472,17 @@ class UIController {
             ])
           : null
       ].filter(Boolean));
+
+      // 綁定喊話按鈕點擊事件 (阻止冒泡)
+      if (!isSelf) {
+        const shoutBtn = card.querySelector('button[title="對此跑友快捷喊話"]');
+        if (shoutBtn && typeof onShoutRunner === 'function') {
+          shoutBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onShoutRunner(id, runner);
+          });
+        }
+      }
 
       // 若有移出按鈕，綁定踢出事件 (阻止事件冒泡以免觸發點擊定位)
       if (isCaptain && !isSelf) {
@@ -566,6 +603,48 @@ class UIController {
   }
 
   /**
+   * 跑友快捷喊話彈窗開關
+   */
+  openQuickShoutModal(targetRunner = null) {
+    if (!this.elements.quickShoutModal) return;
+    this.elements.quickShoutModal.classList.remove('hidden');
+    this.updateTtsUI(speechService.isTtsEnabled);
+    if (this.elements.inputCustomShout) {
+      this.elements.inputCustomShout.value = '';
+      if (targetRunner && targetRunner.name) {
+        this.elements.inputCustomShout.placeholder = `對 ${targetRunner.name} 說點什麼...`;
+      } else {
+        this.elements.inputCustomShout.placeholder = '例如：前面超商買水等你們';
+      }
+      this.elements.inputCustomShout.focus();
+    }
+  }
+
+  closeQuickShoutModal() {
+    if (this.elements.quickShoutModal) {
+      this.elements.quickShoutModal.classList.add('hidden');
+    }
+  }
+
+  /**
+   * 同步語音開關 UI 標籤與圖示
+   */
+  updateTtsUI(isOn) {
+    if (this.elements.btnToggleTts) {
+      if (isOn) {
+        this.elements.btnToggleTts.textContent = '已開啟 (開)';
+        this.elements.btnToggleTts.className = 'text-[11px] font-bold px-2 py-0.5 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/40 hover:bg-teal-500/30 transition';
+      } else {
+        this.elements.btnToggleTts.textContent = '已關閉 (靜音)';
+        this.elements.btnToggleTts.className = 'text-[11px] font-bold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-750 transition';
+      }
+    }
+    if (this.elements.ttsIcon) {
+      this.elements.ttsIcon.textContent = isOn ? '🔊' : '🔇';
+    }
+  }
+
+  /**
    * 口袋黑屏模式切換 (防誤觸與螢幕極致省電)
    * 藉由 OLED/AMOLED 全黑像素關閉電源原理，達成 0% 螢幕耗電且不中斷連線
    */
@@ -682,23 +761,15 @@ class UIController {
    * 電量資訊監聽 (Battery API)
    */
   async initBatteryListener() {
-    if ('getBattery' in navigator) {
-      try {
-        const battery = await navigator.getBattery();
-        this.batteryLevel = Math.round(battery.level * 100);
-        battery.addEventListener('levelchange', () => {
-          this.batteryLevel = Math.round(battery.level * 100);
-        });
-      } catch (e) {
-        this.batteryLevel = 100;
-      }
-    } else {
-      this.batteryLevel = 100;
-    }
+    await batteryService.init();
+    this.batteryLevel = batteryService.level;
+    batteryService.onChange((info) => {
+      this.batteryLevel = info.level;
+    });
   }
 
   getBatteryLevel() {
-    return this.batteryLevel || 100;
+    return batteryService.level;
   }
 
   /**
@@ -905,31 +976,6 @@ class UIController {
       this.elements.joinModal.classList.remove('hidden');
     } else {
       this.elements.joinModal.classList.add('hidden');
-    }
-  }
-
-  /**
-   * 開啟 PWA 安裝指引彈窗
-   * @param {boolean} isIOS 是否為 iOS 裝置
-   */
-  openPwaGuideModal(isIOS = true) {
-    if (!this.elements.pwaGuideModal) return;
-    this.elements.pwaGuideModal.classList.remove('hidden');
-    if (isIOS) {
-      if (this.elements.pwaIosInstructions) this.elements.pwaIosInstructions.classList.remove('hidden');
-      if (this.elements.pwaAndroidInstructions) this.elements.pwaAndroidInstructions.classList.add('hidden');
-    } else {
-      if (this.elements.pwaIosInstructions) this.elements.pwaIosInstructions.classList.add('hidden');
-      if (this.elements.pwaAndroidInstructions) this.elements.pwaAndroidInstructions.classList.remove('hidden');
-    }
-  }
-
-  /**
-   * 關閉 PWA 安裝指引彈窗
-   */
-  closePwaGuideModal() {
-    if (this.elements.pwaGuideModal) {
-      this.elements.pwaGuideModal.classList.add('hidden');
     }
   }
 }

@@ -1,0 +1,25 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$roomId": {
+        ".read": "auth != null",
+        "metadata": {
+          ".write": "auth != null && (!data.exists() || data.child('captainId').val() === auth.uid || data.child('creatorId').val() === auth.uid)"
+        },
+        "runners": {
+          "$runnerId": {
+            ".write": "auth != null && (auth.uid === $runnerId || (!newData.exists() && root.child('rooms').child($roomId).child('metadata').child('captainId').val() === auth.uid))",
+            "lat": {
+              ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+            },
+            "lng": {
+              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+            }
+          }
+        }
+      }
+    }
+  }
+}

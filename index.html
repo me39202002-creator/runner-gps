@@ -121,12 +121,6 @@
           </svg>
         </button>
 
-        <!-- PWA 安裝按鈕 (行動端圖示版) -->
-        <button id="btn-pwa-install-mobile" type="button" class="p-1.5 rounded-xl bg-teal-500/15 border border-teal-500/40 text-teal-300 font-bold text-xs" title="安裝為手機獨立 App (PWA)">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
-        </button>
 
         <!-- 設定按鈕 (行動端圖示版) -->
         <button id="btn-top-settings-mobile" type="button" class="p-1.5 rounded-xl bg-slate-800 border border-slate-700 text-teal-300 font-bold text-xs" title="小隊與系統設定">
@@ -162,13 +156,6 @@
         <span>口袋黑屏</span>
       </button>
 
-      <!-- PWA 安裝按鈕 (桌機/Android/iOS) -->
-      <button id="btn-pwa-install" type="button" class="px-3 py-1.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/40 text-teal-300 font-semibold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-sm" title="安裝為手機/電腦桌面獨立 App">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-        </svg>
-        <span>安裝 App</span>
-      </button>
 
       <!-- 系統與小隊設定按鈕 (桌機版) -->
       <button id="btn-top-settings" type="button" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-teal-300 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-sm" title="小隊與系統設定">
@@ -210,6 +197,11 @@
       <div class="flex items-center gap-2 font-mono font-bold text-xs pl-1">
         <span class="text-teal-400">⚡ <span id="strip-pace">5'52"</span></span>
         <span class="text-sky-400">⏱️ <span id="strip-speed">10.2 km/h</span></span>
+        <!-- 本機電量狀態標籤 -->
+        <span id="strip-battery-badge" class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-mono bg-slate-800 text-emerald-400 border border-slate-700" title="本機剩餘電量">
+          <span id="strip-battery-icon">🔋</span>
+          <span id="strip-battery-text">100%</span>
+        </span>
       </div>
 
       <!-- 運動狀態標籤 -->
@@ -268,6 +260,14 @@
             衛星
           </button>
         </div>
+      </div>
+
+      <!-- 地圖左下一鍵跑友快捷喊話按鈕 (語音/泡泡) -->
+      <div class="absolute bottom-3 left-3 z-10">
+        <button id="btn-quick-shout" type="button" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-xl shadow-teal-500/20 transition active:scale-95 border border-teal-300/40">
+          <span class="text-sm">💬</span>
+          <span>跑友喊話</span>
+        </button>
       </div>
 
       <!-- 地圖右下視野控制鍵 -->
@@ -333,16 +333,6 @@
         <span>邀請跑友加入 (QR Code / 密碼)</span>
       </button>
 
-      <!-- 模式說明與虛擬隊友切換 -->
-      <div class="flex items-center justify-between text-xs py-1 px-1">
-        <div>
-          <span class="text-teal-400 font-bold text-[11px] sm:text-xs">純真實模式</span>
-          <p class="text-slate-400 text-[10px]">無虛擬伴跑，僅真實跑友</p>
-        </div>
-        <button id="btn-toggle-virtual" type="button" class="px-2.5 py-1 rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-700 text-slate-300 font-medium text-[11px] transition">
-          切為虛擬隊友
-        </button>
-      </div>
 
       <!-- 三大關鍵數據方塊 (團隊里程 / 持續分享 / 在線人數) -->
       <div class="grid grid-cols-3 gap-2 sm:gap-3">
@@ -641,27 +631,6 @@
         </div>
       </div>
 
-      <!-- 區塊四：PWA 獨立 App 安裝 (全螢幕原生體驗) -->
-      <div class="bg-[#18263E] border border-teal-500/40 rounded-2xl p-3.5 space-y-2">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-1.5 text-xs font-bold text-teal-400">
-            <span>📱</span>
-            <span>安裝為手機獨立 App (PWA)</span>
-          </div>
-          <span class="text-[10px] text-teal-300 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/30">
-            推薦安裝
-          </span>
-        </div>
-        <p class="text-[10px] text-slate-400 leading-relaxed">
-          安裝為 PWA 後可享受無網址列的原生全螢幕沉浸感，大幅提升手機系統給予的 GPS 背景常駐權限與連線穩定度。
-        </p>
-        <button id="btn-settings-install-pwa" type="button" class="w-full py-2.5 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-bold text-xs shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
-          <span>立即安裝至手機主畫面</span>
-        </button>
-      </div>
 
       <!-- 區塊五：系統快捷動作 (退出小隊) -->
       <div class="bg-[#18263E] border border-slate-700/80 rounded-2xl p-3.5 space-y-2">
@@ -732,57 +701,87 @@
   </div>
 
   <!-- ========================================================================= -->
+  <!-- 9.5 💬 跑友一鍵快捷喊話彈窗 (Quick Shout Sheet / Modal) -->
+  <!-- ========================================================================= -->
+  <div id="quick-shout-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3.5 sm:p-4 hidden">
+    <div class="bg-[#131E32] border border-teal-500/40 rounded-3xl max-w-sm w-full p-4 sm:p-5 shadow-2xl space-y-3.5 text-left animate-in fade-in duration-150">
+      
+      <!-- 標題列 -->
+      <div class="flex items-center justify-between border-b border-slate-700/80 pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-teal-400/20 text-teal-300 flex items-center justify-center text-base">
+            💬
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-base font-extrabold text-white">跑友一鍵快捷喊話</h3>
+            <p class="text-[10px] text-teal-400">點擊立即向小隊廣播，並於隊友耳機朗讀語音！</p>
+          </div>
+        </div>
+        <button id="btn-close-quick-shout" type="button" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">✕</button>
+      </div>
+
+      <!-- 語音朗讀開關列 -->
+      <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-[#18263E] border border-slate-700 text-xs">
+        <span class="text-slate-300 font-semibold flex items-center gap-1.5">
+          <span id="tts-icon">🔊</span>
+          <span>語音自動朗讀隊友喊話</span>
+        </span>
+        <button id="btn-toggle-tts" type="button" class="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/40 hover:bg-teal-500/30 transition">
+          已開啟 (開)
+        </button>
+      </div>
+
+      <!-- 6 大快捷跑步情境片語 (大按鈕防晃動好按) -->
+      <div class="space-y-1.5">
+        <label class="block text-[11px] font-bold text-slate-300">選擇常用快捷跑步片語：</label>
+        <div class="grid grid-cols-2 gap-2 text-xs font-bold">
+          <button type="button" class="btn-shout-option p-2.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/40 text-teal-300 flex items-center gap-1.5 transition active:scale-95 text-left" data-shout="大家加油！最後衝刺！" data-type="cheer">
+            <span class="text-base flex-shrink-0">🏃‍♂️</span>
+            <span class="truncate">加油衝刺</span>
+          </button>
+          <button type="button" class="btn-shout-option p-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 flex items-center gap-1.5 transition active:scale-95 text-left" data-shout="等我一下！放慢配速" data-type="wait">
+            <span class="text-base flex-shrink-0">🛑</span>
+            <span class="truncate">等我一下</span>
+          </button>
+          <button type="button" class="btn-shout-option p-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/40 text-sky-300 flex items-center gap-1.5 transition active:scale-95 text-left" data-shout="我在補給站等大家" data-type="supply">
+            <span class="text-base flex-shrink-0">🥤</span>
+            <span class="truncate">補給站見</span>
+          </button>
+          <button type="button" class="btn-shout-option p-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 flex items-center gap-1.5 transition active:scale-95 text-left" data-shout="注意前方路況，小心紅燈！" data-type="warning">
+            <span class="text-base flex-shrink-0">⚠️</span>
+            <span class="truncate">注意路況</span>
+          </button>
+          <button type="button" class="btn-shout-option p-2.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/40 text-indigo-300 flex items-center gap-1.5 transition active:scale-95 text-left" data-shout="即將抵達折返點！" data-type="turnaround">
+            <span class="text-base flex-shrink-0">🔄</span>
+            <span class="truncate">準備折返</span>
+          </button>
+          <button type="button" class="btn-shout-option p-2.5 rounded-xl bg-rose-600/25 hover:bg-rose-600/40 border border-rose-500 text-rose-200 flex items-center gap-1.5 transition active:scale-95 text-left" data-shout="需要協助！我抽筋了！" data-type="sos">
+            <span class="text-base flex-shrink-0">🆘</span>
+            <span class="truncate">抽筋求助</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 自訂喊話輸入列 -->
+      <div class="space-y-1 pt-1">
+        <label class="block text-[11px] font-bold text-slate-300">或輸入自訂喊話：</label>
+        <div class="flex gap-2">
+          <input id="input-custom-shout" type="text" maxlength="30" placeholder="例如：前面超商買水等你們"
+                 class="flex-1 px-3 py-2 rounded-xl bg-[#18263E] border border-slate-700 text-white focus:outline-none focus:border-teal-400 text-xs font-medium">
+          <button id="btn-send-custom-shout" type="button" class="px-3.5 py-2 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-black text-xs transition active:scale-95 flex items-center gap-1 flex-shrink-0">
+            <span>發送</span>
+            <span>🚀</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
   <!-- 10. Toast 提示容器 -->
   <!-- ========================================================================= -->
   <div id="toast-container" class="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none px-4 w-full max-w-sm"></div>
 
-  <!-- ========================================================================= -->
-  <!-- 11. 📱 PWA 安裝導引彈窗 (iOS / Android / Desktop) -->
-  <!-- ========================================================================= -->
-  <div id="pwa-guide-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-[#131E32] border border-teal-500/40 rounded-3xl max-w-sm w-full p-6 space-y-4 text-center shadow-2xl animate-in fade-in duration-150">
-      <div class="w-16 h-16 rounded-2xl bg-teal-400/20 border border-teal-400/40 mx-auto flex items-center justify-center text-3xl shadow-lg">
-        🏃‍♂️
-      </div>
-
-      <div>
-        <h3 class="text-base sm:text-lg font-extrabold text-white">安裝為手機獨立 App</h3>
-        <p class="text-xs text-slate-400 mt-1">免去網址列干擾，享受原生全螢幕與極致 GPS 穩定度！</p>
-      </div>
-
-      <!-- iOS 指引 -->
-      <div id="pwa-ios-instructions" class="bg-[#18263E] border border-slate-700/80 rounded-2xl p-3.5 text-left text-xs space-y-2 text-slate-200">
-        <div class="font-bold text-teal-400 flex items-center gap-1.5">
-          <span>🍎</span> iPhone (Safari) 兩步安裝法：
-        </div>
-        <ol class="list-decimal list-inside space-y-1.5 text-[11px] text-slate-300 leading-relaxed">
-          <li>點擊 Safari 底部工具列的 <strong class="text-white bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">「分享按鈕」</strong>（方形向上箭頭）</li>
-          <li>往下滑動選單，點選 <strong class="text-white bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">「加入主畫面 ➕」</strong></li>
-          <li>點擊右上角「新增」，手機桌面即出現專屬 App！</li>
-        </ol>
-      </div>
-
-      <!-- Android / Chrome 指引 -->
-      <div id="pwa-android-instructions" class="bg-[#18263E] border border-slate-700/80 rounded-2xl p-3.5 text-left text-xs space-y-2 text-slate-200 hidden">
-        <div class="font-bold text-emerald-400 flex items-center gap-1.5">
-          <span>🤖</span> Android (Chrome) 安裝：
-        </div>
-        <p class="text-[11px] text-slate-300 leading-relaxed">
-          點擊下方「立即安裝」按鈕，系統將自動將跑友即時地圖新增至您的應用程式清單與手機主畫面。
-        </p>
-      </div>
-
-      <div class="space-y-2 pt-1">
-        <button id="btn-pwa-confirm-install" type="button" class="w-full py-2.5 rounded-xl bg-teal-400 hover:bg-teal-500 text-slate-950 font-bold text-xs shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5">
-          <span>📲</span>
-          <span>我知道了 / 立即安裝</span>
-        </button>
-        <button id="btn-close-pwa-guide" type="button" class="w-full py-2 rounded-xl border border-slate-700 text-slate-400 text-xs hover:bg-slate-800 transition">
-          稍後再說
-        </button>
-      </div>
-    </div>
-  </div>
 
   <!-- 載入核心模組 (含快取破除參數) -->
   <script type="module" src="js/app.js?v=20261113_11"></script>

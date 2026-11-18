@@ -30,6 +30,30 @@ export function sanitizeRoomPassword(rawPwd) {
 }
 
 /**
+ * 使用瀏覽器原生 Web Crypto API 計算加鹽 SHA-256 雜湊
+ * 以 roomId 作為鹽值 (Salt)，防範彩虹表字典碰撞攻擊
+ * @param {string} rawPassword 原始密碼
+ * @param {string} roomId 房間 ID
+ * @returns {Promise<string|null>} 64 位元 Hex 雜湊字串
+ */
+export async function hashRoomPassword(rawPassword, roomId) {
+  if (!rawPassword || typeof rawPassword !== 'string') return null;
+  const sanitized = sanitizeRoomPassword(rawPassword);
+  if (!sanitized) return null;
+
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(`${sanitized}_salt_${roomId || 'runner_default'}`);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (err) {
+    console.error('[Security] 密碼雜湊計算失敗:', err);
+    return null;
+  }
+}
+
+/**
  * 安全清理房間名稱
  * @param {string} rawName
  * @param {string} fallback

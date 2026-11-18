@@ -21,6 +21,8 @@ import {
 import { firebaseService } from './services/firebase-service.js';
 import { geolocationService } from './services/geolocation-service.js';
 import { backgroundTrackingService } from './services/background-tracking-service.js';
+import { batteryService } from './services/battery-service.js';
+import { speechService } from './services/speech-service.js';
 import { mapRenderer } from './components/map-renderer.js';
 import { uiController } from './components/ui-controller.js';
 
@@ -36,18 +38,29 @@ class App {
     this.isTracking = false;
     this.latestSelfCoords = null;
     this.cachedRunners = new Map();
-    this.virtualRunnersInterval = null;
-    this.isVirtualMode = false;
     this.heartbeatTimer = null;
     this.offlineSweepTimer = null;
-    this.deferredPrompt = null;
+    this.lastProcessedShouts = new Map(); // 追蹤各跑友最後處理之喊話時間
+    this.shoutTargetRunnerId = null;       // 當前指定喊話目標跑友 (null 為全隊)
   }
 
   async init() {
     console.log('[App] 正在啟動跑友即時地圖...');
     uiController.init();
     this.bindEvents();
-    this.initServiceWorkerAndPWA();
+
+    // 初始化電量服務與地圖快捷喊話
+    batteryService.init().then(() => {
+      if (this.selfRunner) {
+        this.selfRunner.battery = batteryService.level;
+        uiController.updateSelfStrip(this.selfRunner);
+      }
+    });
+
+    mapRenderer.setOnQuickShout((text, type, targetId) => {
+      speechService.primeAudio();
+      this.handleSendShout(text, type, targetId);
+    });
 
     // 檢查 URL 房間參數與可能帶入之密碼
     const urlRoom = getSafeURLParam('room');
@@ -253,26 +266,6 @@ class App {
       el.btnPocketModeMobile.addEventListener('click', () => uiController.togglePocketMode(true));
     }
 
-    // PWA 安裝按鈕事件 (桌機、手機快捷、小隊設定)
-    const handlePwaAction = () => this.triggerPwaInstall();
-    if (el.btnPwaInstall) el.btnPwaInstall.addEventListener('click', handlePwaAction);
-    if (el.btnPwaInstallMobile) el.btnPwaInstallMobile.addEventListener('click', handlePwaAction);
-    if (el.btnSettingsInstallPwa) el.btnSettingsInstallPwa.addEventListener('click', handlePwaAction);
-
-    if (el.btnPwaConfirmInstall) {
-      el.btnPwaConfirmInstall.addEventListener('click', () => {
-        if (this.deferredPrompt) {
-          this.deferredPrompt.prompt();
-          this.deferredPrompt.userChoice.then(() => {
-            this.deferredPrompt = null;
-          });
-        }
-        uiController.closePwaGuideModal();
-      });
-    }
-    if (el.btnClosePwaGuide) {
-      el.btnClosePwaGuide.addEventListener('click', () => uiController.closePwaGuideModal());
-    }
 
     // 邀請彈窗 (頂部鈕與大按鈕)
     if (el.btnTopInvite) {
@@ -484,9 +477,61 @@ class App {
       });
     }
 
-    // 虛擬隊友切換
-    if (el.btnToggleVirtual) {
-      el.btnToggleVirtual.addEventListener('click', () => this.toggleVirtualRunners());
+    // 跑友一鍵快捷語音/泡泡喊話按鈕
+    if (el.btnQuickShout) {
+      el.btnQuickShout.addEventListener('click', () => {
+        speechService.primeAudio();
+        this.shoutTargetRunnerId = null;
+        uiController.openQuickShoutModal();
+      });
+    }
+
+    if (el.btnCloseQuickShout) {
+      el.btnCloseQuickShout.addEventListener('click', () => {
+        uiController.closeQuickShoutModal();
+      });
+    }
+
+    if (el.btnToggleTts) {
+      el.btnToggleTts.addEventListener('click', () => {
+        speechService.primeAudio();
+        const enabled = speechService.setTtsEnabled();
+        uiController.updateTtsUI(enabled);
+        uiController.showToast(enabled ? '🔊 已開啟隊友語音自動朗讀' : '🔇 已關閉語音朗讀 (靜音)', 'info');
+      });
+    }
+
+    // 快捷跑步片語大按鈕
+    document.querySelectorAll('.btn-shout-option').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        speechService.primeAudio();
+        const text = btn.dataset.shout;
+        const type = btn.dataset.type;
+        this.handleSendShout(text, type, this.shoutTargetRunnerId);
+        uiController.closeQuickShoutModal();
+      });
+    });
+
+    // 自訂喊話發送
+    if (el.btnSendCustomShout && el.inputCustomShout) {
+      const sendCustom = () => {
+        speechService.primeAudio();
+        const text = el.inputCustomShout.value.trim();
+        if (text) {
+          this.handleSendShout(text, 'custom', this.shoutTargetRunnerId);
+          uiController.closeQuickShoutModal();
+        } else {
+          uiController.showToast('請輸入喊話內容', 'warning');
+        }
+      };
+
+      el.btnSendCustomShout.addEventListener('click', sendCustom);
+      el.inputCustomShout.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          sendCustom();
+        }
+      });
     }
 
     // 監聽螢幕點亮或重新回到網頁 (Visibility Change) 即刻恢復在線並補發 GPS
@@ -506,11 +551,6 @@ class App {
         }
       }
     });
-
-    // 聚集伴跑隊友
-    if (el.btnGatherTeam) {
-      el.btnGatherTeam.addEventListener('click', () => this.gatherVirtualRunners());
-    }
 
     // 頂部小隊管理按鈕 (直接開啟隊長設定彈窗)
     if (el.btnJumpTeam) {
@@ -891,6 +931,10 @@ class App {
           this.selfRunner
         );
 
+        // 同步已通過驗證之身分識別碼 (UID)
+        uiController.setSelfRunnerId(this.selfRunner.id);
+        mapRenderer.setSelfRunnerId(this.selfRunner.id);
+
         if (!joinRes.success && joinRes.reason === 'WRONG_PASSWORD') {
           // 密碼錯誤或需要密碼，彈出密碼輸入彈窗
           uiController.openPasswordModal(
@@ -905,6 +949,8 @@ class App {
               );
               if (retryRes.success) {
                 uiController.closePasswordModal();
+                uiController.setSelfRunnerId(this.selfRunner.id);
+                mapRenderer.setSelfRunnerId(this.selfRunner.id);
                 this.roomName = retryRes.roomName || this.roomName;
                 this.hasRoomPassword = retryRes.hasPassword;
                 if (retryRes.captainId) {
@@ -967,9 +1013,9 @@ class App {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     if (this.offlineSweepTimer) clearInterval(this.offlineSweepTimer);
 
-    // 每 25 秒發送一次心跳包，維持線上活躍狀態
+    // 每 25 秒發送一次心跳包，維持線上活躍狀態與最新電量
     this.heartbeatTimer = setInterval(() => {
-      firebaseService.sendHeartbeat();
+      firebaseService.sendHeartbeat(batteryService.level);
     }, 25000);
 
     // 每 15 秒掃描一次小隊成員，若有人離線超過 3 分鐘 (180,000 ms) 自動移出小隊
@@ -1081,7 +1127,8 @@ class App {
 
   handleLocationUpdate(coordsData) {
     this.latestSelfCoords = coordsData;
-    const battery = uiController.getBatteryLevel();
+    const batteryInfo = batteryService.getBatteryInfo();
+    const batteryLevel = batteryInfo.level;
 
     const selfData = {
       ...this.selfRunner,
@@ -1091,7 +1138,7 @@ class App {
       speed: coordsData.speed,
       heading: coordsData.heading,
       totalDistanceMeters: coordsData.totalDistanceMeters || 0,
-      battery: battery,
+      battery: batteryLevel,
       isOnline: true,
       updatedAt: Date.now()
     };
@@ -1104,7 +1151,8 @@ class App {
       (id, r) => this.handleFocusRunner(id, r),
       (id, r) => this.handleKickRunner(id, r),
       this.selfRunner.isCaptain,
-      this.captainId
+      this.captainId,
+      (id, r) => this.openShoutForRunner(id, r)
     );
     uiController.updateSelfStrip(selfData);
 
@@ -1116,13 +1164,38 @@ class App {
     // 推送至 Firebase
     firebaseService.updateLocation({
       ...coordsData,
-      battery: battery
+      battery: batteryLevel
     });
   }
 
   handleRunnerUpdated(runnerId, runnerData) {
     this.cachedRunners.set(runnerId, runnerData);
     const isSelf = runnerId === this.selfRunner.id;
+
+    // 處理最新喊話 (語音朗讀、震動與地圖氣泡)
+    if (runnerData.latestShout && runnerData.latestShout.text) {
+      const shout = runnerData.latestShout;
+      const shoutTime = shout.localTimestamp || shout.timestamp || 0;
+      const lastTime = this.lastProcessedShouts.get(runnerId) || 0;
+      const isRecent = (Date.now() - shoutTime) < 15000;
+
+      if (shoutTime > lastTime && isRecent) {
+        this.lastProcessedShouts.set(runnerId, shoutTime);
+
+        if (!isSelf) {
+          // 1. 語音朗讀
+          speechService.speak(shout.text, runnerData.name);
+          // 2. 觸覺震動
+          speechService.vibrate([120, 60, 120]);
+          // 3. 頂部 Toast 提示
+          uiController.showToast(`💬 ${runnerData.name}：${shout.text}`, 'info');
+        }
+
+        // 4. 在地圖該跑友標記上方彈出動態氣泡 (泡泡)
+        mapRenderer.showShoutBubble(runnerId, shout.text, runnerData.avatar);
+      }
+    }
+
     mapRenderer.updateRunner(runnerId, runnerData, isSelf);
     uiController.upsertRunner(
       runnerId,
@@ -1130,12 +1203,38 @@ class App {
       (id, r) => this.handleFocusRunner(id, r),
       (id, r) => this.handleKickRunner(id, r),
       this.selfRunner.isCaptain,
-      this.captainId
+      this.captainId,
+      (id, r) => this.openShoutForRunner(id, r)
     );
 
     if (isSelf) {
       uiController.updateSelfStrip(runnerData);
     }
+  }
+
+  /**
+   * 發送一鍵快捷語音/泡泡喊話
+   */
+  async handleSendShout(text, type = 'cheer', targetRunnerId = null) {
+    if (!text) return;
+    speechService.primeAudio();
+    const success = await firebaseService.sendQuickShout(text, type, targetRunnerId);
+    if (success) {
+      mapRenderer.showShoutBubble(this.selfRunner.id, text, this.selfRunner.avatar);
+      uiController.showToast(`💬 您已廣播喊話：「${text}」`, 'success');
+      speechService.vibrate([80]);
+    } else {
+      uiController.showToast('發送失敗，請確認網路連線', 'error');
+    }
+  }
+
+  /**
+   * 對特定隊友開啟喊話對話視窗
+   */
+  openShoutForRunner(runnerId, runner) {
+    speechService.primeAudio();
+    this.shoutTargetRunnerId = runnerId;
+    uiController.openQuickShoutModal(runner);
   }
 
   handleRunnerRemoved(runnerId) {
@@ -1244,77 +1343,6 @@ class App {
     }
   }
 
-  /**
-   * 切換虛擬隊友 (提供無伴時伴跑)
-   */
-  toggleVirtualRunners() {
-    this.isVirtualMode = !this.isVirtualMode;
-    const btn = uiController.elements.btnToggleVirtual;
-    const tag = uiController.elements.headerModeTag;
-
-    if (this.isVirtualMode) {
-      if (btn) btn.textContent = '關閉虛擬隊友';
-      if (tag) tag.textContent = '虛擬伴跑模式';
-      uiController.showToast('已啟用 2 位虛擬伴跑隊友！', 'success');
-
-      let step = 0;
-      const baseLat = this.latestSelfCoords ? this.latestSelfCoords.lat : 25.033964;
-      const baseLng = this.latestSelfCoords ? this.latestSelfCoords.lng : 121.564468;
-
-      this.virtualRunnersInterval = setInterval(() => {
-        step += 0.05;
-        // 伴跑跑友 1: 小華
-        const pacer1 = {
-          id: 'virtual_runner_1',
-          name: '小華 (陪跑員)',
-          avatar: '🏃‍♀️',
-          color: '#F59E0B',
-          lat: baseLat + Math.sin(step) * 0.0015,
-          lng: baseLng + Math.cos(step) * 0.0018,
-          speed: 2.9, // ~10.4 km/h
-          totalDistanceMeters: Math.round(step * 150),
-          isOnline: true,
-          battery: 92
-        };
-        // 伴跑跑友 2: 阿強
-        const pacer2 = {
-          id: 'virtual_runner_2',
-          name: '阿強 (破風者)',
-          avatar: '⚡',
-          color: '#38BDF8',
-          lat: baseLat + Math.cos(step * 0.8) * 0.002,
-          lng: baseLng + Math.sin(step * 0.8) * 0.0022,
-          speed: 3.4, // ~12.2 km/h
-          totalDistanceMeters: Math.round(step * 180),
-          isOnline: true,
-          battery: 85
-        };
-
-        this.handleRunnerUpdated(pacer1.id, pacer1);
-        this.handleRunnerUpdated(pacer2.id, pacer2);
-      }, 2000);
-    } else {
-      if (btn) btn.textContent = '切為虛擬隊友';
-      if (tag) tag.textContent = '純真實模式';
-      if (this.virtualRunnersInterval) {
-        clearInterval(this.virtualRunnersInterval);
-        this.virtualRunnersInterval = null;
-      }
-      this.handleRunnerRemoved('virtual_runner_1');
-      this.handleRunnerRemoved('virtual_runner_2');
-      uiController.showToast('已切換回純真實模式', 'info');
-    }
-  }
-
-  gatherVirtualRunners() {
-    if (!this.latestSelfCoords) {
-      uiController.showToast('請先確認本機 GPS 訊號', 'warning');
-      return;
-    }
-    uiController.showToast('已將全體隊友位置重設至您的周邊！', 'success');
-    mapRenderer.fitAllRunners();
-  }
-
   showInviteModal() {
     const inviteUrl = new URL(window.location.origin + window.location.pathname);
     inviteUrl.searchParams.set('room', this.roomId);
@@ -1336,75 +1364,6 @@ class App {
       uiController.showToast('邀請連結已複製！隊友點開可自動帶入密碼加入', 'success');
     } catch (e) {
       uiController.showToast(`邀請網址: ${inviteUrl.toString()}`, 'info');
-    }
-  }
-
-  /**
-   * 初始化 PWA 漸進式網頁應用程式 (Service Worker + 安裝事件攔截)
-   */
-  initServiceWorkerAndPWA() {
-    // 1. 註冊 Service Worker 實現本機快取與離線加速
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then((reg) => {
-            console.log('[PWA] Service Worker 註冊成功，範圍:', reg.scope);
-            reg.addEventListener('updatefound', () => {
-              const newWorker = reg.installing;
-              if (newWorker) {
-                newWorker.addEventListener('statechange', () => {
-                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    uiController.showToast('🚀 發現新版本程式，已為您自動快取加速！', 'info');
-                  }
-                });
-              }
-            });
-          })
-          .catch((err) => {
-            console.warn('[PWA] Service Worker 註冊略過:', err);
-          });
-      });
-    }
-
-    // 2. 攔截 beforeinstallprompt 事件 (Chrome / Edge / Android)
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      this.deferredPrompt = e;
-      console.log('[PWA] 已捕獲安裝事件 (beforeinstallprompt)');
-    });
-
-    // 3. 監聽已安裝成功事件
-    window.addEventListener('appinstalled', () => {
-      this.deferredPrompt = null;
-      console.log('[PWA] 已成功安裝為本機獨立 App');
-      uiController.showToast('🎉 已成功安裝為獨立 App！可直接從手機桌面開啟', 'success');
-    });
-  }
-
-  /**
-   * 觸發 PWA 安裝程序 (跨平台智慧適配)
-   */
-  triggerPwaInstall() {
-    // 檢查是否已在獨立 App 模式下運行
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    if (isStandalone) {
-      uiController.showToast('📱 您已在獨立 App 模式下運行！', 'info');
-      return;
-    }
-
-    // 若瀏覽器已準備好原生安裝提示 (Android / Chrome / Edge)
-    if (this.deferredPrompt) {
-      this.deferredPrompt.prompt();
-      this.deferredPrompt.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === 'accepted') {
-          uiController.showToast('📲 正在安裝為桌面應用程式...', 'success');
-        }
-        this.deferredPrompt = null;
-      });
-    } else {
-      // iOS Safari 或尚未觸發原生 prompt，開啟圖文操作導引
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      uiController.openPwaGuideModal(isIOS);
     }
   }
 

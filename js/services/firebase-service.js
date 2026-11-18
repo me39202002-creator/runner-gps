@@ -5,6 +5,7 @@
  */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import {
   getDatabase,
   ref,
@@ -20,11 +21,14 @@ import {
   onDisconnect,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+import { hashRoomPassword } from '../security.js';
 
 class FirebaseService {
   constructor() {
     this.app = null;
+    this.auth = null;
     this.db = null;
+    this.currentUser = null;
     this.currentRoomId = null;
     this.currentRunnerId = null;
     this.runnersRef = null;
@@ -52,8 +56,14 @@ class FirebaseService {
 
     try {
       this.app = initializeApp(firebaseConfig);
+      this.auth = getAuth(this.app);
       this.db = getDatabase(this.app);
       this.isInitialized = true;
+
+      // 預先於背景執行匿名認證，確保連線具備有效 auth.uid
+      this.ensureAuthenticated().catch((err) => {
+        console.warn('[FirebaseService] 預先匿名認證排程:', err);
+      });
 
       // 監聽本機與 Firebase RTDB 伺服器之連線狀態 (.info/connected)
       this.connectedRef = ref(this.db, '.info/connected');
@@ -99,7 +109,30 @@ class FirebaseService {
   }
 
   /**
-   * 驗證房間密碼並加入小隊
+   * 確保目前處於已驗證狀態 (若尚未驗證則自動發起匿名驗證)
+   * 取得由 Google 官方核發且無法假造的唯一 auth.uid
+   * @returns {Promise<Object>} Firebase User 物件
+   */
+  async ensureAuthenticated() {
+    if (!this.auth) throw new Error('Firebase Auth 尚未初始化');
+    if (this.auth.currentUser) {
+      this.currentUser = this.auth.currentUser;
+      return this.currentUser;
+    }
+
+    try {
+      const credential = await signInAnonymously(this.auth);
+      this.currentUser = credential.user;
+      console.log(`[FirebaseService] 匿名身分認證成功，UID: ${this.currentUser.uid}`);
+      return this.currentUser;
+    } catch (err) {
+      console.error('[FirebaseService] 匿名認證失敗:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * 驗證房間密碼並加入小隊 (整合匿名 UID 與 SHA-256 密碼防護)
    * @param {string} roomId 房間 ID
    * @param {string} roomName 房間名稱 (自訂)
    * @param {string|null} password 房間密碼 (可為空)
@@ -109,15 +142,22 @@ class FirebaseService {
   async verifyAndJoinRoom(roomId, roomName, password, runnerInfo) {
     if (!this.db) throw new Error('Firebase 尚未初始化');
 
+    // 1. 確保匿名認證完成，並將 runnerInfo.id 綁定至系統驗證之 auth.uid
+    const user = await this.ensureAuthenticated();
+    if (user && user.uid) {
+      runnerInfo.id = user.uid;
+    }
+
     const metaRef = ref(this.db, `rooms/${roomId}/metadata`);
     const snapshot = await get(metaRef);
 
     if (!snapshot.exists()) {
-      // 房間尚不存在，建立新房間，第一位加入者即為唯一隊長
+      // 房間尚不存在，建立新房間，計算密碼之 SHA-256 雜湊
+      const passwordHash = password ? await hashRoomPassword(password, roomId) : null;
       const metadata = {
         name: roomName || '跑友即時小隊',
-        password: password || null,
-        hasPassword: !!password,
+        passwordHash: passwordHash, // 僅儲存加鹽雜湊，絕不存明文
+        hasPassword: !!passwordHash,
         captainId: runnerInfo.id,
         creatorId: runnerInfo.id,
         createdAt: serverTimestamp()
@@ -134,26 +174,21 @@ class FirebaseService {
         isCaptain: true
       };
     } else {
-      // 房間已存在，檢查是否需要密碼
+      // 房間已存在，透過 SHA-256 雜湊進行安全密碼驗證
       const metadata = snapshot.val();
       if (metadata.hasPassword) {
-        if (!password || String(password).trim() !== String(metadata.password).trim()) {
+        const inputHash = password ? await hashRoomPassword(password, roomId) : null;
+        // 相容歷史房間資料 (若含有 passwordHash 優先使用雜湊比對；若為舊版明文則向下相容)
+        const isMatch = (metadata.passwordHash && inputHash === metadata.passwordHash) ||
+                        (!metadata.passwordHash && metadata.password && String(password).trim() === String(metadata.password).trim());
+
+        if (!isMatch) {
           return {
             success: false,
             reason: 'WRONG_PASSWORD',
             roomName: metadata.name,
             hasPassword: true
           };
-        }
-      }
-
-      // 若有傳入新的自訂名稱且不同於現存名稱，自動同步更新至 Firebase
-      if (roomName && roomName !== '跑友即時小隊' && roomName !== metadata.name) {
-        try {
-          await update(metaRef, { name: roomName, updatedAt: serverTimestamp() });
-          metadata.name = roomName;
-        } catch (e) {
-          console.warn('[FirebaseService] 更新房間名稱警告:', e);
         }
       }
 
@@ -180,13 +215,25 @@ class FirebaseService {
 
         // 若無其他在線跑友，則此人就是最早也是唯一的隊長
         currentCaptainId = earliestRunnerId || runnerInfo.id;
-        try {
-          await update(metaRef, { captainId: currentCaptainId });
-        } catch (e) {}
+        if (currentCaptainId === runnerInfo.id) {
+          try {
+            await update(metaRef, { captainId: currentCaptainId });
+          } catch (e) {}
+        }
       }
 
       const isCaptain = (currentCaptainId === runnerInfo.id);
       runnerInfo.isCaptain = isCaptain;
+
+      // 只有隊長才擁有更新房間名稱之特權 (嚴格符合後端安全規則，隊友加入時不越權寫入)
+      if (isCaptain && roomName && roomName !== '跑友即時小隊' && roomName !== metadata.name) {
+        try {
+          await update(metaRef, { name: roomName, updatedAt: serverTimestamp() });
+          metadata.name = roomName;
+        } catch (e) {
+          console.warn('[FirebaseService] 隊長更新房間名稱警告:', e);
+        }
+      }
 
       await this.joinRoom(roomId, runnerInfo);
       return {
@@ -201,7 +248,7 @@ class FirebaseService {
   }
 
   /**
-   * 隊長更新小隊設定 (名稱、代碼、密碼)
+   * 隊長更新小隊設定 (名稱、代碼、密碼) - 密碼採 SHA-256 加鹽儲存
    * @param {string} roomId 
    * @param {string} newName 
    * @param {string|null} newPassword 
@@ -209,16 +256,21 @@ class FirebaseService {
   async updateRoomMetadata(roomId, newName, newPassword) {
     if (!this.db) throw new Error('Firebase 尚未初始化');
     const metaRef = ref(this.db, `rooms/${roomId}/metadata`);
-    await update(metaRef, {
+    const passwordHash = newPassword ? await hashRoomPassword(newPassword, roomId) : null;
+
+    const payload = {
       name: newName || '跑友即時小隊',
-      password: newPassword || null,
-      hasPassword: !!newPassword,
+      passwordHash: passwordHash,
+      password: null, // 主動覆蓋清空歷史舊版明文
+      hasPassword: !!passwordHash,
       updatedAt: serverTimestamp()
-    });
+    };
+
+    await update(metaRef, payload);
   }
 
   /**
-   * 監聽小隊設定變更 (讓隊友畫面即時同步隊長修改的名稱與密碼狀態)
+   * 監聽小隊設定變更 (過濾隱藏密碼雜湊，僅向隊友廣播安全欄位)
    */
   subscribeToRoomMetadata(roomId, onMetadataUpdated) {
     if (!this.db || !roomId) return;
@@ -229,9 +281,17 @@ class FirebaseService {
     this.metaRef = ref(this.db, `rooms/${roomId}/metadata`);
     onValue(this.metaRef, (snapshot) => {
       if (snapshot.exists()) {
-        const data = snapshot.val();
+        const rawData = snapshot.val();
+        // 敏感防護：剔除任何密碼或雜湊資訊，防止在隊友客戶端記憶體洩漏
+        const safeData = {
+          name: rawData.name || '跑友即時小隊',
+          hasPassword: !!rawData.hasPassword,
+          captainId: rawData.captainId,
+          creatorId: rawData.creatorId,
+          updatedAt: rawData.updatedAt
+        };
         if (typeof onMetadataUpdated === 'function') {
-          onMetadataUpdated(data);
+          onMetadataUpdated(safeData);
         }
       }
     });
@@ -264,6 +324,7 @@ class FirebaseService {
       name: runnerInfo.name,
       color: runnerInfo.color,
       avatar: runnerInfo.avatar || '🏃',
+      battery: runnerInfo.battery ?? null,
       isOnline: true,
       isCaptain: !!runnerInfo.isCaptain,
       joinedAt: serverTimestamp(),
@@ -276,7 +337,7 @@ class FirebaseService {
 
   /**
    * 上報本機即時 GPS 座標至資料庫
-   * @param {Object} coordsData { lat, lng, accuracy, speed, heading }
+   * @param {Object} coordsData { lat, lng, accuracy, speed, heading, battery }
    */
   async updateLocation(coordsData) {
     if (!this.db || !this.currentRoomId || !this.currentRunnerId) return;
@@ -288,6 +349,8 @@ class FirebaseService {
       accuracy: coordsData.accuracy ?? null,
       speed: coordsData.speed ?? null,
       heading: coordsData.heading ?? null,
+      totalDistanceMeters: coordsData.totalDistanceMeters ?? null,
+      battery: coordsData.battery ?? null,
       updatedAt: serverTimestamp(),
       isOnline: true
     };
@@ -296,6 +359,37 @@ class FirebaseService {
       await update(myRunnerRef, updatePayload);
     } catch (err) {
       console.error('[FirebaseService] 座標上傳失敗:', err);
+    }
+  }
+
+  /**
+   * 發送一鍵跑步快捷語音/泡泡喊話至小隊
+   * @param {string} text 喊話內容
+   * @param {string} type 喊話類型 (cheer, wait, supply, warning, turnaround, sos, custom)
+   * @param {string|null} targetRunnerId 目標跑友 ID (null 代表對全隊喊話)
+   * @returns {Promise<boolean>}
+   */
+  async sendQuickShout(text, type = 'cheer', targetRunnerId = null) {
+    if (!this.db || !this.currentRoomId || !this.currentRunnerId) return false;
+
+    const myRunnerRef = ref(this.db, `rooms/${this.currentRoomId}/runners/${this.currentRunnerId}`);
+    const shoutPayload = {
+      text: String(text).slice(0, 50),
+      type: type || 'cheer',
+      targetRunnerId: targetRunnerId || null,
+      timestamp: serverTimestamp(),
+      localTimestamp: Date.now()
+    };
+
+    try {
+      await update(myRunnerRef, {
+        latestShout: shoutPayload,
+        updatedAt: serverTimestamp()
+      });
+      return true;
+    } catch (err) {
+      console.error('[FirebaseService] 發送跑友喊話失敗:', err);
+      return false;
     }
   }
 
@@ -342,16 +436,21 @@ class FirebaseService {
 
   /**
    * 發送線上心跳包 (Heartbeat)，防止靜止休息時被誤判超時
+   * @param {Object|null} batteryInfo
    */
-  async sendHeartbeat() {
+  async sendHeartbeat(batteryInfo = null) {
     if (!this.db || !this.currentRoomId || !this.currentRunnerId) return;
     const myRunnerRef = ref(this.db, `rooms/${this.currentRoomId}/runners/${this.currentRunnerId}`);
     try {
-      await update(myRunnerRef, {
+      const payload = {
         isOnline: true,
         lastSeen: serverTimestamp(),
         updatedAt: serverTimestamp()
-      });
+      };
+      if (batteryInfo != null) {
+        payload.battery = batteryInfo;
+      }
+      await update(myRunnerRef, payload);
     } catch (e) {
       // 斷線時忽略
     }
