@@ -3,7 +3,7 @@
  * @description PWA Service Worker - 跑友即時地圖離線快取與加速
  */
 
-const CACHE_NAME = 'runner-gps-v20261113_1';
+const CACHE_NAME = 'runner-gps-v20261118_shout';
 
 const STATIC_PRECACHE = [
   './',
@@ -15,6 +15,9 @@ const STATIC_PRECACHE = [
   './js/services/firebase-service.js',
   './js/services/geolocation-service.js',
   './js/services/background-tracking-service.js',
+  './js/services/battery-service.js',
+  './js/services/speech-service.js',
+  './js/services/kalman-filter.js',
   './js/components/map-renderer.js',
   './js/components/ui-controller.js',
   './manifest.json',
