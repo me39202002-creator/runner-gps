@@ -374,6 +374,7 @@ class FirebaseService {
 
     const myRunnerRef = ref(this.db, `rooms/${this.currentRoomId}/runners/${this.currentRunnerId}`);
     const shoutPayload = {
+      id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       text: String(text).slice(0, 50),
       type: type || 'cheer',
       targetRunnerId: targetRunnerId || null,

@@ -1,8 +1,9 @@
 /**
  * @file speech-service.js
- * @description 語音廣播與跑友快捷喊話服務
- * 整合瀏覽器與原生 WebView 之 Web Speech Synthesis API (TTS)，
- * 支援文字轉繁體中文語音自動朗讀、震動反饋 (Haptic Feedback) 與常用跑步快捷片語。
+ * @description 語音廣播與跑友快捷喊話服務 (針對 Android、iOS 與行動 WebView 深度相容優化)
+ * 1. 雙重提示：Web Audio 雙音叮咚鈴聲 (Chime) + Web Speech Synthesis (TTS 語音朗讀)
+ * 2. 徹底解決 Android Chrome / WebView 的 V8 記憶體回收 (GC)、暫停 (Paused) 及語音包延遲載入問題
+ * 3. 支援全螢幕任意觸控自動解鎖 (Autoplay Policy Unlock) 與震動提示
  */
 
 export const QUICK_SHOUT_TEMPLATES = [
@@ -63,22 +64,128 @@ class SpeechService {
     this.isTtsEnabled = localStorage.getItem('runner_gps_tts_enabled') !== 'false';
     this.lastSpokenText = null;
     this.lastSpokenTime = 0;
+    this.activeUtterances = new Set(); // 關鍵：防止 Android V8 垃圾回收機制提早中止語音
+    this.audioCtx = null;
+    this.cachedVoices = [];
+
+    this.initVoiceLoader();
+    this.setupGlobalUnlock();
   }
 
   /**
-   * 解鎖行動裝置之 Web Audio / Speech 播放限制
-   * 需於使用者手勢事件 (如點擊按鈕) 觸發
+   * 初始化非同步語音包載入監聽 (Android Chrome 語音包非同步機制)
+   */
+  initVoiceLoader() {
+    if (!this.isSupported) return;
+    try {
+      this.cachedVoices = window.speechSynthesis.getVoices() || [];
+      window.speechSynthesis.onvoiceschanged = () => {
+        this.cachedVoices = window.speechSynthesis.getVoices() || [];
+      };
+    } catch (e) {
+      console.warn('[SpeechService] 語音包清單讀取警告:', e);
+    }
+  }
+
+  /**
+   * 智慧全域解鎖：使用者在螢幕上點擊或滑動任意位置，即刻解除瀏覽器 Audio/Speech Autoplay 限制
+   */
+  setupGlobalUnlock() {
+    if (typeof document === 'undefined') return;
+
+    const unlockHandler = () => {
+      this.primeAudio();
+      document.removeEventListener('touchstart', unlockHandler, true);
+      document.removeEventListener('touchend', unlockHandler, true);
+      document.removeEventListener('click', unlockHandler, true);
+      document.removeEventListener('pointerdown', unlockHandler, true);
+    };
+
+    document.addEventListener('touchstart', unlockHandler, { once: true, passive: true, capture: true });
+    document.addEventListener('touchend', unlockHandler, { once: true, passive: true, capture: true });
+    document.addEventListener('click', unlockHandler, { once: true, passive: true, capture: true });
+    document.addEventListener('pointerdown', unlockHandler, { once: true, passive: true, capture: true });
+  }
+
+  /**
+   * 解鎖行動裝置 AudioContext 與 SpeechSynthesis
    */
   primeAudio() {
-    if (this.isAudioPrimed || !this.isSupported) return;
+    if (this.isAudioPrimed) return;
+
+    // 1. 解鎖 Web AudioContext
     try {
-      const emptyUtter = new SpeechSynthesisUtterance('');
-      emptyUtter.volume = 0;
-      window.speechSynthesis.speak(emptyUtter);
-      this.isAudioPrimed = true;
-      console.log('[SpeechService] 語音引擎已解鎖就緒');
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtxClass && !this.audioCtx) {
+        this.audioCtx = new AudioCtxClass();
+      }
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume();
+      }
+    } catch (e) {}
+
+    // 2. 解鎖 SpeechSynthesis (Android / iOS 需由手勢發起微量語音)
+    if (this.isSupported) {
+      try {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+        const dummyUtterance = new SpeechSynthesisUtterance(' ');
+        dummyUtterance.volume = 0.01;
+        this.activeUtterances.add(dummyUtterance);
+        dummyUtterance.onend = () => this.activeUtterances.delete(dummyUtterance);
+        dummyUtterance.onerror = () => this.activeUtterances.delete(dummyUtterance);
+        window.speechSynthesis.speak(dummyUtterance);
+      } catch (e) {}
+    }
+
+    this.isAudioPrimed = true;
+    console.log('[SpeechService] 音訊與語音引擎已全面解鎖就緒');
+  }
+
+  /**
+   * 播放科技感跑步提示雙音「叮咚 🎵」
+   * 即使 TTS 在某些特殊 Android 機型被靜音，使用者依然能 100% 聽見響亮的提示鈴聲！
+   */
+  playChime() {
+    try {
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtxClass) return;
+
+      if (!this.audioCtx) {
+        this.audioCtx = new AudioCtxClass();
+      }
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume();
+      }
+
+      const now = this.audioCtx.currentTime;
+
+      // 第一音 (E5 - 659.25Hz)
+      const osc1 = this.audioCtx.createOscillator();
+      const gain1 = this.audioCtx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(659.25, now);
+      gain1.gain.setValueAtTime(0.35, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      osc1.connect(gain1);
+      gain1.connect(this.audioCtx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.16);
+
+      // 第二音 (A5 - 880Hz)
+      const osc2 = this.audioCtx.createOscillator();
+      const gain2 = this.audioCtx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880, now + 0.12);
+      gain2.gain.setValueAtTime(0.40, now + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+      osc2.connect(gain2);
+      gain2.connect(this.audioCtx.destination);
+      osc2.start(now + 0.12);
+      osc2.stop(now + 0.38);
     } catch (e) {
-      console.warn('[SpeechService] 語音解鎖異常:', e);
+      console.warn('[SpeechService] 鈴聲播放受限:', e);
     }
   }
 
@@ -97,12 +204,12 @@ class SpeechService {
   }
 
   /**
-   * 朗讀跑友喊話內容 (TTS 繁體中文)
+   * 朗讀跑友喊話內容 (TTS 繁體中文，含 Android Chrome 深度相容修復)
    * @param {string} text 喊話訊息
    * @param {string} senderName 發送者暱稱
    */
   speak(text, senderName = '') {
-    if (!this.isTtsEnabled || !this.isSupported || !text) return;
+    if (!this.isTtsEnabled || !text) return;
 
     // 避免 2 秒內重複朗讀相同一句話
     const now = Date.now();
@@ -112,30 +219,65 @@ class SpeechService {
     this.lastSpokenText = text;
     this.lastSpokenTime = now;
 
+    // 1. 無論如何優先播放響亮叮咚提示鈴聲（喚醒音訊硬體與藍牙耳機通道）
+    this.playChime();
+
+    if (!this.isSupported) return;
+
     try {
-      // 停止目前正在念的句子
-      window.speechSynthesis.cancel();
-
-      const messageToSpeak = senderName ? `${senderName} 說：${text}` : text;
-      const utterance = new SpeechSynthesisUtterance(messageToSpeak);
-
-      utterance.lang = 'zh-TW';
-      utterance.rate = 1.05; // 跑步時稍微敏捷明快的語速
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-
-      // 嘗試選取 zh-TW 本地語音包
-      const voices = window.speechSynthesis.getVoices();
-      if (voices && voices.length > 0) {
-        const twVoice = voices.find(v => v.lang === 'zh-TW' || v.lang === 'zh_TW' || v.lang.includes('TW'));
-        if (twVoice) {
-          utterance.voice = twVoice;
-        }
+      // 確保 Android 未被卡在 paused 狀態
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
       }
 
-      window.speechSynthesis.speak(utterance);
+      // Android 避坑：若目前正在唸，執行 cancel，並延遲 50ms 再呼叫 speak
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
+
+      setTimeout(() => {
+        try {
+          const messageToSpeak = senderName ? `${senderName} 說：${text}` : text;
+          const utterance = new SpeechSynthesisUtterance(messageToSpeak);
+
+          utterance.lang = 'zh-TW';
+          utterance.rate = 1.05; // 跑步時稍微敏捷明快的語速
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+
+          // 智慧篩選適合的繁體或中文語音包
+          const voices = this.cachedVoices.length > 0 ? this.cachedVoices : window.speechSynthesis.getVoices();
+          if (voices && voices.length > 0) {
+            const twVoice = voices.find(v => {
+              const lang = (v.lang || '').toLowerCase();
+              return lang.includes('zh-tw') || lang.includes('zh_tw') || lang.includes('cmn-hant-tw') || lang.includes('cmn-tw');
+            }) || voices.find(v => {
+              const lang = (v.lang || '').toLowerCase();
+              return lang.startsWith('zh') || lang.includes('cmn') || (v.name && (v.name.includes('Taiwan') || v.name.includes('台灣') || v.name.includes('國語')));
+            });
+
+            if (twVoice) {
+              utterance.voice = twVoice;
+            }
+          }
+
+          // 關鍵修復：將 utterance 存入 Set 中，防範 Android V8 GC 機制提早清除語音
+          this.activeUtterances.add(utterance);
+          utterance.onend = () => {
+            this.activeUtterances.delete(utterance);
+          };
+          utterance.onerror = (e) => {
+            this.activeUtterances.delete(utterance);
+            console.warn('[SpeechService] 語音朗讀事件警示:', e);
+          };
+
+          window.speechSynthesis.speak(utterance);
+        } catch (innerErr) {
+          console.warn('[SpeechService] speak 呼叫異常:', innerErr);
+        }
+      }, 50);
     } catch (err) {
-      console.warn('[SpeechService] 朗讀失敗:', err);
+      console.warn('[SpeechService] 朗讀準備失敗:', err);
     }
   }
 
@@ -143,7 +285,7 @@ class SpeechService {
    * 觸發觸覺震動回饋 (Haptic Feedback)
    * @param {number[]} pattern 震動節奏毫秒
    */
-  vibrate(pattern = [100, 50, 100]) {
+  vibrate(pattern = [120, 60, 120]) {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate(pattern);

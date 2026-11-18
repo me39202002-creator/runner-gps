@@ -501,6 +501,16 @@ class App {
       });
     }
 
+    // 試聽語音與鈴聲按鈕
+    const btnTestSpeech = document.getElementById('btn-test-speech');
+    if (btnTestSpeech) {
+      btnTestSpeech.addEventListener('click', () => {
+        speechService.primeAudio();
+        speechService.speak('語音廣播測試，大家加油！', '跑友小隊');
+        uiController.showToast('🎵 正在試聽叮咚提示鈴聲與語音朗讀...', 'info');
+      });
+    }
+
     // 快捷跑步片語大按鈕
     document.querySelectorAll('.btn-shout-option').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1172,18 +1182,23 @@ class App {
     this.cachedRunners.set(runnerId, runnerData);
     const isSelf = runnerId === this.selfRunner.id;
 
-    // 處理最新喊話 (語音朗讀、震動與地圖氣泡)
+    // 處理最新喊話 (雙重保證：叮咚鈴聲 + 語音朗讀、震動與地圖氣泡)
     if (runnerData.latestShout && runnerData.latestShout.text) {
       const shout = runnerData.latestShout;
+      const shoutId = shout.id || `${shout.localTimestamp || shout.timestamp}_${shout.text}`;
+      const lastId = this.lastProcessedShouts.get(runnerId);
       const shoutTime = shout.localTimestamp || shout.timestamp || 0;
-      const lastTime = this.lastProcessedShouts.get(runnerId) || 0;
-      const isRecent = (Date.now() - shoutTime) < 15000;
 
-      if (shoutTime > lastTime && isRecent) {
-        this.lastProcessedShouts.set(runnerId, shoutTime);
+      // 檢查是否為新抵達的喊話 (利用 unique shoutId，避免受手機與主機之間的時間差影響)
+      const isNewShout = shoutId && shoutId !== lastId;
+      // 若是剛進入房間看到 45 秒前的歷史喊話則不朗讀，避免剛進房被轟炸
+      const isNotExpired = !shoutTime || Math.abs(Date.now() - shoutTime) < 45000;
+
+      if (isNewShout && isNotExpired) {
+        this.lastProcessedShouts.set(runnerId, shoutId);
 
         if (!isSelf) {
-          // 1. 語音朗讀
+          // 1. 播放叮咚鈴聲與語音朗讀 (Android 深度優化版)
           speechService.speak(shout.text, runnerData.name);
           // 2. 觸覺震動
           speechService.vibrate([120, 60, 120]);
