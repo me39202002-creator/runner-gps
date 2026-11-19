@@ -1358,8 +1358,33 @@ class App {
     }
   }
 
+  /**
+   * 取得外部隊友可訪問的公開分享基底網址
+   * 解決原生 APP (Capacitor) 於手機內部以 https://localhost 或 capacitor:// 運行時，
+   * 產生的邀請連結與 QR Code 變成 localhost 導致隊友點開無法連線的問題。
+   */
+  getPublicShareBaseUrl() {
+    const origin = window.location.origin || '';
+    const isLocalhostOrApp = origin.includes('localhost') || 
+                             origin.includes('127.0.0.1') || 
+                             origin.includes('capacitor://') ||
+                             origin.includes('file://');
+
+    if (isLocalhostOrApp) {
+      // 指向公開上線之正式網址 (GitHub Pages)，確保任何隊友手機皆可一鍵連上
+      return this.config.publicShareUrl || 'https://me39202002-creator.github.io/runner-gps/';
+    }
+
+    // 若本來就在正式公開網域 (例如 GitHub Pages)，則使用當前頁面網址
+    let basePath = window.location.origin + window.location.pathname;
+    if (!basePath.endsWith('/')) {
+      basePath += '/';
+    }
+    return basePath;
+  }
+
   showInviteModal() {
-    const inviteUrl = new URL(window.location.origin + window.location.pathname);
+    const inviteUrl = new URL(this.getPublicShareBaseUrl());
     inviteUrl.searchParams.set('room', this.roomId);
     if (this.roomPassword) {
       // 產生的連結包含房間代碼
@@ -1369,7 +1394,7 @@ class App {
   }
 
   async copyInviteUrl() {
-    const inviteUrl = new URL(window.location.origin + window.location.pathname);
+    const inviteUrl = new URL(this.getPublicShareBaseUrl());
     inviteUrl.searchParams.set('room', this.roomId);
     if (this.roomPassword) {
       inviteUrl.searchParams.set('pwd', this.roomPassword);

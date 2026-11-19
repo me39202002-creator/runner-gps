@@ -4,6 +4,9 @@
  */
 
 const DEFAULT_CONFIG = {
+  // 公開邀請分享基礎網址 (供原生 APP 與本機測試產生外部隊友可訪問之連結)
+  publicShareUrl: 'https://me39202002-creator.github.io/runner-gps/',
+
   // Google Maps JavaScript API 金鑰
   googleMapsApiKey: 'AIzaSyDlZZObJLVB69jtS8wvlAHWEKgcZlEC63I',
 
