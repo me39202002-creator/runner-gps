@@ -1,7 +1,10 @@
 /**
  * @file speech-service.js
  * @description 語音廣播與跑友快捷喊話服務 (針對 Android、iOS 與行動 WebView 深度相容優化)
- * 1. 雙重提示：Web Audio 雙音叮咚鈴聲 (Chime) + Web Speech Synthesis (TTS 語音朗讀)
+ * 1. 頂級三重音訊保證：
+ *    - 第一重：Web Audio 科技感雙音叮咚鈴聲 (Chime - 100% 硬體直出)
+ *    - 第二重：本機預錄高清中文語音包 (Web Audio Buffer / HTML5 Audio 直播，零延遲、免本機 TTS 引擎、無痛相容所有安卓與小折疊/平價機)
+ *    - 第三重：動態高音質雲端語音串流 + 系統 Web Speech Synthesis (自訂喊話彈性備援)
  * 2. 徹底解決 Android Chrome / WebView 的 V8 記憶體回收 (GC)、暫停 (Paused) 及語音包延遲載入問題
  * 3. 支援全螢幕任意觸控自動解鎖 (Autoplay Policy Unlock) 與震動提示
  */
@@ -57,6 +60,16 @@ export const QUICK_SHOUT_TEMPLATES = [
   }
 ];
 
+export const PRESET_AUDIO_CONFIG = [
+  { id: 'cheer', keywords: ['加油', '衝刺'], file: 'audio/shout_cheer.mp3', text: '大家加油！最後衝刺！' },
+  { id: 'wait', keywords: ['等我', '放慢'], file: 'audio/shout_wait.mp3', text: '等我一下！放慢配速' },
+  { id: 'supply', keywords: ['補給'], file: 'audio/shout_supply.mp3', text: '我在補給站等大家' },
+  { id: 'warning', keywords: ['路況', '紅燈', '小心'], file: 'audio/shout_warning.mp3', text: '注意前方路況，小心紅燈！' },
+  { id: 'turnaround', keywords: ['折返'], file: 'audio/shout_turnaround.mp3', text: '即將抵達折返點！' },
+  { id: 'sos', keywords: ['抽筋', '協助', '求助'], file: 'audio/shout_sos.mp3', text: '需要協助！我抽筋了！' },
+  { id: 'test', keywords: ['測試', '試聽'], file: 'audio/test_speech.mp3', text: '語音廣播測試，大家加油！' }
+];
+
 class SpeechService {
   constructor() {
     this.isSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -64,9 +77,11 @@ class SpeechService {
     this.isTtsEnabled = localStorage.getItem('runner_gps_tts_enabled') !== 'false';
     this.lastSpokenText = null;
     this.lastSpokenTime = 0;
-    this.activeUtterances = new Set(); // 關鍵：防止 Android V8 垃圾回收機制提早中止語音
+    this.activeUtterances = new Set();
     this.audioCtx = null;
     this.cachedVoices = [];
+    this.audioBuffers = new Map(); // 預先解碼的 Web Audio Buffer (0ms 極速播放)
+    this.audioPlayer = null; // HTML5 Audio 播放器單例
 
     this.initVoiceLoader();
     this.setupGlobalUnlock();
@@ -108,7 +123,7 @@ class SpeechService {
   }
 
   /**
-   * 解鎖行動裝置 AudioContext 與 SpeechSynthesis
+   * 解鎖行動裝置 AudioContext、HTML5 Audio 與 SpeechSynthesis
    */
   primeAudio() {
     if (this.isAudioPrimed) return;
@@ -122,9 +137,26 @@ class SpeechService {
       if (this.audioCtx && this.audioCtx.state === 'suspended') {
         this.audioCtx.resume();
       }
+      // 異步預載入常用音效緩衝區 (Web Audio Pipeline)
+      this.preloadAudioBuffers();
     } catch (e) {}
 
-    // 2. 解鎖 SpeechSynthesis (Android / iOS 需由手勢發起微量語音)
+    // 2. 解鎖 HTML5 Audio 播放實例
+    try {
+      if (!this.audioPlayer) {
+        this.audioPlayer = new Audio();
+      }
+      // 播放一段極微小的靜音 wav 進行授權解鎖
+      this.audioPlayer.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      const playPromise = this.audioPlayer.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          this.audioPlayer.pause();
+        }).catch(() => {});
+      }
+    } catch (e) {}
+
+    // 3. 解鎖 SpeechSynthesis (Android / iOS 需由手勢發起微量語音)
     if (this.isSupported) {
       try {
         if (window.speechSynthesis.paused) {
@@ -140,12 +172,32 @@ class SpeechService {
     }
 
     this.isAudioPrimed = true;
-    console.log('[SpeechService] 音訊與語音引擎已全面解鎖就緒');
+    console.log('[SpeechService] 頂級多通道音訊引擎已全面解鎖就緒');
+  }
+
+  /**
+   * 預先非同步加載預錄音頻至 Web AudioContext 記憶體中
+   */
+  async preloadAudioBuffers() {
+    if (!this.audioCtx) return;
+    for (const item of PRESET_AUDIO_CONFIG) {
+      if (this.audioBuffers.has(item.id)) continue;
+      try {
+        const response = await fetch(item.file);
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await this.audioCtx.decodeAudioData(arrayBuffer);
+          this.audioBuffers.set(item.id, audioBuffer);
+        }
+      } catch (err) {
+        // 略過靜態載入失敗，播放時仍有 HTML5 Audio 與 TTS 雙重後備
+      }
+    }
   }
 
   /**
    * 播放科技感跑步提示雙音「叮咚 🎵」
-   * 即使 TTS 在某些特殊 Android 機型被靜音，使用者依然能 100% 聽見響亮的提示鈴聲！
+   * 雙頻率合成 (E5 659.25Hz -> A5 880Hz)，長度約 380ms
    */
   playChime() {
     try {
@@ -190,6 +242,65 @@ class SpeechService {
   }
 
   /**
+   * 透過 Web Audio 管道直接播放預解碼的音頻緩衝區 (與 Chime 同一管線，100% 成功且無衝突)
+   * @param {string} bufferId 
+   * @param {number} delaySec 延遲秒數 (等鈴聲播放完畢)
+   * @returns {boolean} 是否成功發起播放
+   */
+  playBufferSource(bufferId, delaySec = 0.40) {
+    if (!this.audioCtx || !this.audioBuffers.has(bufferId)) return false;
+    try {
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume();
+      }
+      const buffer = this.audioBuffers.get(bufferId);
+      const source = this.audioCtx.createBufferSource();
+      const gainNode = this.audioCtx.createGain();
+      gainNode.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
+
+      source.buffer = buffer;
+      source.connect(gainNode);
+      gainNode.connect(this.audioCtx.destination);
+
+      source.start(this.audioCtx.currentTime + delaySec);
+      return true;
+    } catch (e) {
+      console.warn('[SpeechService] Buffer 播放失敗:', e);
+      return false;
+    }
+  }
+
+  /**
+   * 透過 HTML5 Audio 標籤播放音訊 (本地 mp3 或線上語音串流)
+   * @param {string} src 音訊 URL
+   * @param {number} delayMs 延遲毫秒數
+   */
+  playAudioFile(src, delayMs = 400) {
+    setTimeout(() => {
+      try {
+        if (!this.audioPlayer) {
+          this.audioPlayer = new Audio();
+        }
+        this.audioPlayer.pause();
+        this.audioPlayer.currentTime = 0;
+        this.audioPlayer.volume = 1.0;
+        this.audioPlayer.src = src;
+
+        const playPromise = this.audioPlayer.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            console.warn('[SpeechService] Audio 元素播放異常，轉入 TTS 備援:', err);
+            // 若音訊串流失敗，最後回退到本機 Web Speech
+            this.speakNativeTts(this.lastSpokenText || '');
+          });
+        }
+      } catch (err) {
+        console.warn('[SpeechService] playAudioFile 失敗:', err);
+      }
+    }, delayMs);
+  }
+
+  /**
    * 切換語音朗讀開關 (開/關)
    * @param {boolean|null} enable 
    */
@@ -204,80 +315,122 @@ class SpeechService {
   }
 
   /**
-   * 朗讀跑友喊話內容 (TTS 繁體中文，含 Android Chrome 深度相容修復)
+   * 朗讀跑友喊話內容 (多層保證：叮咚 -> 預錄語音/雲端語音串流 -> 本機系統 TTS)
    * @param {string} text 喊話訊息
    * @param {string} senderName 發送者暱稱
    */
   speak(text, senderName = '') {
     if (!this.isTtsEnabled || !text) return;
 
-    // 避免 2 秒內重複朗讀相同一句話
+    // 避免 1.5 秒內重複觸發同一句話
     const now = Date.now();
-    if (this.lastSpokenText === text && (now - this.lastSpokenTime) < 2000) {
+    if (this.lastSpokenText === text && (now - this.lastSpokenTime) < 1500) {
       return;
     }
     this.lastSpokenText = text;
     this.lastSpokenTime = now;
 
-    // 1. 無論如何優先播放響亮叮咚提示鈴聲（喚醒音訊硬體與藍牙耳機通道）
+    // 1. 優先播放科技感雙音叮咚鈴聲 (與耳機/揚聲器建立通道)
     this.playChime();
 
-    if (!this.isSupported) return;
+    // 2. 檢測是否匹配預錄語音庫 (涵蓋所有 6 大快捷按鈕與測試按鈕)
+    const matchedPreset = PRESET_AUDIO_CONFIG.find(item => {
+      return item.keywords.some(kw => text.includes(kw)) || text.includes(item.text);
+    });
+
+    if (matchedPreset) {
+      // 2A. 首選：Web Audio Buffer 直播 (零延遲、同通道硬體直出)
+      const bufferPlayed = this.playBufferSource(matchedPreset.id, 0.40);
+      if (bufferPlayed) {
+        console.log(`[SpeechService] 使用 Web Audio Buffer 播放預錄語音: ${matchedPreset.text}`);
+        return;
+      }
+
+      // 2B. 次選：HTML5 Audio 本地 mp3 檔案播放
+      console.log(`[SpeechService] 使用本地音檔播放: ${matchedPreset.file}`);
+      this.playAudioFile(matchedPreset.file, 400);
+      return;
+    }
+
+    // 3. 自訂內容處理 (跑友自己輸入的非快捷喊話內容)
+    const messageToSpeak = senderName ? `${senderName}說：${text}` : text;
+
+    // 3A. 首選：使用高音質中文雲端語音串流 (對安卓 WebView 100% 有效)
+    try {
+      const cloudTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=zh-TW&q=${encodeURIComponent(messageToSpeak)}`;
+      console.log(`[SpeechService] 播放高音質自訂語音串流: ${messageToSpeak}`);
+      this.playAudioFile(cloudTtsUrl, 400);
+    } catch (e) {
+      // 3B. 備選：原生系統 TTS 朗讀
+      this.speakNativeTts(messageToSpeak, 420);
+    }
+  }
+
+  /**
+   * 系統原生 Web Speech API 朗讀備援 (當所有音訊檔案與線上串流受阻時觸發)
+   * @param {string} message 
+   * @param {number} delayMs 
+   */
+  speakNativeTts(message, delayMs = 420) {
+    if (!this.isSupported || !message) return;
 
     try {
-      // 確保 Android 未被卡在 paused 狀態
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
       }
-
-      // Android 避坑：若目前正在唸，執行 cancel，並延遲 50ms 再呼叫 speak
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
       }
 
       setTimeout(() => {
         try {
-          const messageToSpeak = senderName ? `${senderName} 說：${text}` : text;
-          const utterance = new SpeechSynthesisUtterance(messageToSpeak);
-
-          utterance.lang = 'zh-TW';
-          utterance.rate = 1.05; // 跑步時稍微敏捷明快的語速
+          const utterance = new SpeechSynthesisUtterance(message);
+          utterance.rate = 1.05;
           utterance.pitch = 1.0;
           utterance.volume = 1.0;
 
-          // 智慧篩選適合的繁體或中文語音包
-          const voices = this.cachedVoices.length > 0 ? this.cachedVoices : window.speechSynthesis.getVoices();
+          const liveVoices = window.speechSynthesis.getVoices() || [];
+          const voices = liveVoices.length > 0 ? liveVoices : this.cachedVoices;
+          let selectedVoice = null;
+
           if (voices && voices.length > 0) {
-            const twVoice = voices.find(v => {
+            selectedVoice = voices.find(v => {
               const lang = (v.lang || '').toLowerCase();
               return lang.includes('zh-tw') || lang.includes('zh_tw') || lang.includes('cmn-hant-tw') || lang.includes('cmn-tw');
-            }) || voices.find(v => {
-              const lang = (v.lang || '').toLowerCase();
-              return lang.startsWith('zh') || lang.includes('cmn') || (v.name && (v.name.includes('Taiwan') || v.name.includes('台灣') || v.name.includes('國語')));
             });
-
-            if (twVoice) {
-              utterance.voice = twVoice;
+            if (!selectedVoice) {
+              selectedVoice = voices.find(v => {
+                const lang = (v.lang || '').toLowerCase();
+                const name = (v.name || '').toLowerCase();
+                return lang.startsWith('zh') || lang.includes('cmn') || name.includes('taiwan') || name.includes('chinese') || name.includes('中文') || name.includes('國語');
+              });
+            }
+            if (!selectedVoice) {
+              selectedVoice = voices.find(v => v.default) || voices[0];
             }
           }
 
-          // 關鍵修復：將 utterance 存入 Set 中，防範 Android V8 GC 機制提早清除語音
+          if (selectedVoice) {
+            utterance.voice = selectedVoice;
+            utterance.lang = selectedVoice.lang || 'zh-TW';
+          } else {
+            utterance.lang = 'zh-TW';
+          }
+
           this.activeUtterances.add(utterance);
-          utterance.onend = () => {
-            this.activeUtterances.delete(utterance);
-          };
+          utterance.onend = () => this.activeUtterances.delete(utterance);
           utterance.onerror = (e) => {
             this.activeUtterances.delete(utterance);
-            console.warn('[SpeechService] 語音朗讀事件警示:', e);
+            console.warn('[SpeechService] 原生 TTS 朗讀警示:', e.error || e);
           };
 
           window.speechSynthesis.speak(utterance);
         } catch (innerErr) {
-          console.warn('[SpeechService] speak 呼叫異常:', innerErr);
+          console.warn('[SpeechService] speakNativeTts 內部異常:', innerErr);
         }
-      }, 50);
+      }, delayMs);
     } catch (err) {
-      console.warn('[SpeechService] 朗讀準備失敗:', err);
+      console.warn('[SpeechService] 原生 TTS 呼叫失敗:', err);
     }
   }
 

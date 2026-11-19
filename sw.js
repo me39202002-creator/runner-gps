@@ -3,7 +3,7 @@
  * @description PWA Service Worker - 跑友即時地圖離線快取與加速
  */
 
-const CACHE_NAME = 'runner-gps-v20261118_shout';
+const CACHE_NAME = 'runner-gps-v20261119_voice';
 
 const STATIC_PRECACHE = [
   './',
@@ -26,7 +26,14 @@ const STATIC_PRECACHE = [
   './icons/icon-maskable-192.png',
   './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png',
-  './icons/icon.svg'
+  './icons/icon.svg',
+  './audio/shout_cheer.mp3',
+  './audio/shout_wait.mp3',
+  './audio/shout_supply.mp3',
+  './audio/shout_warning.mp3',
+  './audio/shout_turnaround.mp3',
+  './audio/shout_sos.mp3',
+  './audio/test_speech.mp3'
 ];
 
 // 安裝階段：預先快取核心資源
